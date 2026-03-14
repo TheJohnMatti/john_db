@@ -2,7 +2,9 @@
 #include <fstream>
 #include "engine.hpp"
 
-Engine::Engine() {
+Engine::Engine() {};
+
+void Engine::init() {
     read_tables_folder();
 };
 
@@ -15,8 +17,8 @@ void Engine::read_tables_folder() {
     std::filesystem::path path{ ".\\tables" };
     std::filesystem::directory_iterator dir{path};
     for (auto &i : dir) {
-        std::cout << i << std::endl;
-        tables.push_back(parse_table_metadata(i));
+        std::cout << i.path().filename().string() << std::endl;
+        tables[i.path().filename().string()] = parse_table_metadata(i);
     }
 }
 

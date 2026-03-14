@@ -4,6 +4,7 @@
 #include "column.hpp"
 
 struct Table {
+    Table() : name{"unnamed_table"} {}
     Table(std::string name) : name{name} {}
     std::string name;
     std::vector<Column> columns;
