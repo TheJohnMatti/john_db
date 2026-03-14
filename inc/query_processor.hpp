@@ -36,8 +36,8 @@ class QueryProcessor {
 
     private:
     Query get_tokens(std::string_view);
-    void select_handler(Query), insert_handler(Query), update_handler(Query), delete_handler(Query),
-    create_handler(Query), alter_handler(Query), drop_handler(Query), unknown_handler(Query);
+    void select_handler(Query&), insert_handler(Query&), update_handler(Query&), delete_handler(Query&),
+    create_handler(Query&), alter_handler(Query&), drop_handler(Query&), unknown_handler(Query&);
     Engine &engine = Engine::instance();
     std::bitset<256> special_characters;
 

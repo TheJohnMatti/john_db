@@ -1,8 +1,10 @@
 #include "query_processor.hpp"
 #include <utility>
+#include <array>
 
 QueryProcessor::QueryProcessor() {
-    special_characters[')'] = special_characters['('] = special_characters[','] = 1;
+    const std::array special = {'(', ')', ',', '=', '>', '<'};
+    for (auto &i : special) special_characters[i] = 1;
 };
 
 Query QueryProcessor::get_tokens(std::string_view query) {
@@ -25,7 +27,6 @@ Query QueryProcessor::get_tokens(std::string_view query) {
 }
 
 void QueryProcessor::process(std::string_view query) {
-
     Query tokens = get_tokens(query);
     if (!tokens.size()) return;
     std::string_view &starter = tokens[0];
@@ -35,7 +36,7 @@ void QueryProcessor::process(std::string_view query) {
         return;
     }
     const HandlerEnum &handler = it->second;
-    auto handler_func = [&](){
+    auto handler_func = [handler](){
         switch (handler) {
             case SELECT: return select_handler;
             case INSERT: return insert_handler;
@@ -51,28 +52,27 @@ void QueryProcessor::process(std::string_view query) {
     (this->*handler_func)(tokens);
 }
 
-void QueryProcessor::select_handler(Query query) {
+void QueryProcessor::select_handler(Query& query) {
 
 }
-
-void QueryProcessor::insert_handler(Query query) {
-
-}
-void QueryProcessor::update_handler(Query query) {
+void QueryProcessor::insert_handler(Query& query) {
 
 }
-void QueryProcessor::delete_handler(Query query) {
+void QueryProcessor::update_handler(Query& query) {
 
 }
-void QueryProcessor::create_handler(Query query) {
+void QueryProcessor::delete_handler(Query& query) {
 
 }
-void QueryProcessor::alter_handler(Query query) {
+void QueryProcessor::create_handler(Query& query) {
 
 }
-void QueryProcessor::drop_handler(Query query) {
+void QueryProcessor::alter_handler(Query& query) {
 
 }
-void QueryProcessor::unknown_handler(Query query) {
+void QueryProcessor::drop_handler(Query& query) {
+
+}
+void QueryProcessor::unknown_handler(Query& query) {
 
 }

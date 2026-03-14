@@ -5,4 +5,5 @@
 struct Column {
     std::string name;
     DataType type;
+    bool is_index;
 };
