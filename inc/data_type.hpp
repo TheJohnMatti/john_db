@@ -7,3 +7,10 @@ enum DataType {
     VARCHAR,
     BOOL,
 };
+
+const std::array data_to_char = {
+    'u',
+    'i',
+    's',
+    'b'
+};

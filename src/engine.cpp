@@ -6,6 +6,8 @@ Engine::Engine() {
     char_to_type['i'] = INT;
     char_to_type['s'] = VARCHAR;
     char_to_type['b'] = BOOL;
+    read_tables_folder();
+    for (auto &i : tables) write_table_metadata(i);
 };
 
 Engine& Engine::instance() {
@@ -14,7 +16,7 @@ Engine& Engine::instance() {
 }
 
 void Engine::read_tables_folder() {
-    std::filesystem::path path{".\\tables"};
+    std::filesystem::path path{ ".\\tables" };
     std::filesystem::directory_iterator dir{path};
     for (auto &i : dir) {
         std::cout << i << std::endl;
@@ -22,10 +24,29 @@ void Engine::read_tables_folder() {
     }
 }
 
+void Engine::write_table_metadata(Table& table) {
+    std::filesystem::path path{ ".\\tables\\" + table.name };
+    if (!std::filesystem::is_directory(path)) {
+        std::filesystem::create_directory(path);
+    }
+    std::filesystem::directory_entry dir{ path };
+    std::filesystem::path metadata_path{dir.path().string() + "\\metadata.data"};
+    std::ofstream output_file{ metadata_path };
+    std::vector<int> indexes;
+    output_file << table.columns.size() << '\n';
+    for (int i{}; i < table.columns.size(); i++) {
+        Column &column = table.columns[i];
+        if (column.is_index) indexes.push_back(i);
+        output_file << data_to_char[column.type] << ' ' << column.name << '\n';
+    }
+    output_file << indexes.size() << '\n';
+    for (auto &i : indexes) output_file << i << '\n';
+}
+
 Table Engine::parse_table_metadata(std::filesystem::directory_entry dir) {
     Table table{dir.path().filename().string()};
     std::filesystem::path metadata_path{dir.path().string() + "\\metadata.data"};
-    std::ifstream input_file(metadata_path);
+    std::ifstream input_file{ metadata_path };
     if (input_file.is_open()) {
         int columns;
         input_file >> columns;
@@ -34,7 +55,6 @@ Table Engine::parse_table_metadata(std::filesystem::directory_entry dir) {
             std::string col_name;
             input_file >> col_type >> col_name;
             table.add_column(char_to_type[col_type], std::move(col_name));
-            //std::cout << table.columns.back().name << ' ' << table.columns.back().type << std::endl;
         }
         int indexes;
         input_file >> indexes;

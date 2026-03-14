@@ -16,7 +16,6 @@ int main() {
     
     print_intro();
     QueryProcessor processor;
-    Engine::instance().read_tables_folder();
 
     while (1) {
         std::string query;
