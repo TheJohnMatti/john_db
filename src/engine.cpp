@@ -3,11 +3,7 @@
 #include "engine.hpp"
 
 Engine::Engine() {
-    char_to_type['i'] = INT;
-    char_to_type['s'] = VARCHAR;
-    char_to_type['b'] = BOOL;
     read_tables_folder();
-    for (auto &i : tables) write_table_metadata(i);
 };
 
 Engine& Engine::instance() {
@@ -37,7 +33,7 @@ void Engine::write_table_metadata(Table& table) {
     for (int i{}; i < table.columns.size(); i++) {
         Column &column = table.columns[i];
         if (column.is_index) indexes.push_back(i);
-        output_file << data_to_char[column.type] << ' ' << column.name << '\n';
+        output_file << data_to_char[(size_t)column.type] << ' ' << column.name << '\n';
     }
     output_file << indexes.size() << '\n';
     for (auto &i : indexes) output_file << i << '\n';
@@ -54,7 +50,7 @@ Table Engine::parse_table_metadata(std::filesystem::directory_entry dir) {
             char col_type; 
             std::string col_name;
             input_file >> col_type >> col_name;
-            table.add_column(char_to_type[col_type], std::move(col_name));
+            table.add_column(char_to_data[col_type], std::move(col_name));
         }
         int indexes;
         input_file >> indexes;

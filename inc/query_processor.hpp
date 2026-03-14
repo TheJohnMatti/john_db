@@ -32,6 +32,13 @@ const std::unordered_map<std::string, HandlerEnum> FIRST_TO_HANDLER = {
     {"DROP", DROP}
 };
 
+static constexpr std::array special = {'(', ')', ',', '=', '>', '<', ';'};
+constexpr auto special_characters = []{
+    std::bitset<256> b{};
+    for (auto c : special) b[c] = 1;
+    return b;
+}();
+
 class QueryProcessor {
 
     private:
@@ -39,7 +46,6 @@ class QueryProcessor {
     void select_handler(Query&), insert_handler(Query&), update_handler(Query&), delete_handler(Query&),
     create_handler(Query&), alter_handler(Query&), drop_handler(Query&), unknown_handler(Query&);
     Engine &engine = Engine::instance();
-    std::bitset<256> special_characters;
 
     public:
     QueryProcessor();

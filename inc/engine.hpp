@@ -8,7 +8,6 @@ class Engine {
     private:
     Engine();
     std::vector<Table> tables;
-    std::array<DataType, 256> char_to_type = {};
 
     public:
     static Engine& instance();

@@ -2,10 +2,7 @@
 #include <utility>
 #include <array>
 
-QueryProcessor::QueryProcessor() {
-    const std::array special = {'(', ')', ',', '=', '>', '<'};
-    for (auto &i : special) special_characters[i] = 1;
-};
+QueryProcessor::QueryProcessor() {};
 
 Query QueryProcessor::get_tokens(std::string_view query) {
     Query res;
