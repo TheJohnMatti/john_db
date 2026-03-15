@@ -1,6 +1,8 @@
+#pragma once
+
 #include <string>
-#include <variant>
 #include <unordered_map>
+#include "data_type.hpp"
 
 enum class TokenType {
     UNDEFINED = 0,
@@ -15,6 +17,17 @@ enum class TokenType {
     FROM,
     INTO, 
     AS,
+    ORDER,
+    BY,
+    DESC,
+    ASC,
+    HAVING,
+    COUNT,
+    SUM,
+    AVG,
+    MAX,
+    MIN,
+    WHERE,
     STRING, // literals start
     INT,
     FLOAT,
@@ -24,10 +37,9 @@ enum class TokenType {
     GREATERTHAN,
     EQUAL,
     LESSTHAN,
+    ASTERISK,
     IDENTIFIER, // identifiers start
 };
-
-using Data = std::variant<std::monostate, std::string, int, double>;
 
 struct Token {
     TokenType type;
@@ -49,6 +61,16 @@ const std::unordered_map<std::string, TokenType> keyword_to_token = {
     {"FROM", TokenType::FROM},
     {"INTO", TokenType::INTO},
     {"AS", TokenType::AS},
+    {"ORDER", TokenType::ORDER},
+    {"BY", TokenType::BY},
+    {"DESC", TokenType::DESC},
+    {"ASC", TokenType::ASC},
+    {"HAVING", TokenType::HAVING},
+    {"COUNT", TokenType::COUNT},
+    {"SUM", TokenType::SUM},
+    {"AVG", TokenType::AVG},
+    {"MAX", TokenType::MAX},
+    {"MIN", TokenType::MIN},
 };
 
 // TODO: refactor to 256 long array with constexpr lambda
@@ -59,4 +81,25 @@ const std::unordered_map<char, TokenType> special_char_to_token = {
     {'>', TokenType::GREATERTHAN},
     {'=', TokenType::EQUAL},
     {'<', TokenType::LESSTHAN},
+    {'*', TokenType::ASTERISK},
 };
+
+static const std::unordered_set<TokenType> operators {
+    TokenType::LESSTHAN,
+    TokenType::EQUAL,
+    TokenType::GREATERTHAN,
+};
+
+static const std::unordered_set<TokenType> literals {
+    TokenType::STRING,
+    TokenType::INT,
+    TokenType::FLOAT,
+};
+
+bool is_operator(TokenType token_type) {
+    return operators.count(token_type);
+}
+
+bool is_literal(TokenType token_type) {
+    return literals.count(token_type);
+}

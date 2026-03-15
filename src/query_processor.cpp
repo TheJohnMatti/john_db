@@ -3,6 +3,7 @@
 #include <array>
 #include <algorithm>
 #include <cctype>
+#include "error.hpp"
 
 QueryProcessor::QueryProcessor() {};
 
@@ -28,9 +29,9 @@ QueryString QueryProcessor::get_token_strings(std::string_view query) {
             continue;
         }
         int j;
-        for (j = i; j < query.size() && query[j] != ' '; j++){}
+        for (j = i; j < query.size() && query[j] != ' ' && !special_characters[query[j]]; j++){}
         res.push_back(query.substr(i, j-i));
-        i = j+1;
+        i = (j < query.size() && special_characters[query[j]]) ? j : j+1;
     }
     return res;
 }
@@ -103,7 +104,7 @@ bool QueryProcessor::is_identifier(std::string_view token) {
     return true;
 }
 
-void QueryProcessor::process(std::string_view query) {
+Query QueryProcessor::process(std::string_view query) {
     QueryString token_strings;
     Query tokens;
 
@@ -117,54 +118,9 @@ void QueryProcessor::process(std::string_view query) {
 
     try {
         tokens = get_tokens(token_strings);
-    }  catch (TokenizeError error) {
+    } catch (TokenizeError error) {
         std::cerr << error.what() << std::endl;
         return;
     }
-
-    Token &starter = tokens[0];
-    auto it = first_token_to_handler.find(starter.type);
-    if (it == first_token_to_handler.end()) {
-        std::cerr << "Unknown command: " << token_strings[0] << std::endl;
-        return;
-    }
-    const HandlerEnum &handler = it->second;
-    auto handler_func = [handler](){
-        switch (handler) {
-            case SELECT: return select_handler;
-            case INSERT: return insert_handler;
-            case UPDATE: return update_handler;
-            case DELETE: return delete_handler;
-            case CREATE: return create_handler;
-            case ALTER: return alter_handler;
-            case DROP: return drop_handler;
-            default: return unknown_handler;
-        } 
-    }();
-    (this->*handler_func)(tokens);
-}
-
-void QueryProcessor::select_handler(Query& query) {
-    std::cout << "select handler" << std::endl;
-}
-void QueryProcessor::insert_handler(Query& query) {
-
-}
-void QueryProcessor::update_handler(Query& query) {
-
-}
-void QueryProcessor::delete_handler(Query& query) {
-
-}
-void QueryProcessor::create_handler(Query& query) {
-
-}
-void QueryProcessor::alter_handler(Query& query) {
-
-}
-void QueryProcessor::drop_handler(Query& query) {
-
-}
-void QueryProcessor::unknown_handler(Query& query) {
-
+    return tokens;
 }

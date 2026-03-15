@@ -17,7 +17,8 @@ int main() {
     
     print_intro();
     QueryProcessor processor;
-    Engine::instance().init();
+    Engine &engine = Engine::instance();
+    engine.init();
 
     while (1) {
         std::cout << "johndb> ";
@@ -32,7 +33,9 @@ int main() {
             print_options();
             continue;
         }
-        processor.process(std::string_view(query));
+        Query tokens = processor.process(std::string_view(query));
+        engine.run(tokens);
+    
     }
 
     return 0;

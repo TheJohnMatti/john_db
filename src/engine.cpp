@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include "engine.hpp"
+#include "error.hpp"
+#include "predicate.hpp"
 
 Engine::Engine() {};
 
@@ -30,12 +32,11 @@ void Engine::write_table_metadata(Table& table) {
     std::filesystem::directory_entry dir{ path };
     std::filesystem::path metadata_path{dir.path().string() + "\\metadata.data"};
     std::ofstream output_file{ metadata_path };
-    std::vector<int> indexes;
+    std::vector<std::string> indexes;
     output_file << table.columns.size() << '\n';
-    for (int i{}; i < table.columns.size(); i++) {
-        Column &column = table.columns[i];
-        if (column.is_index) indexes.push_back(i);
-        output_file << data_to_char[(size_t)column.type] << ' ' << column.name << '\n';
+    for (auto &[name, column] : table.columns) {
+        if (column.is_index) indexes.push_back(name);
+        output_file << data_to_char[(size_t)column.type] << ' ' << name << '\n';
     }
     output_file << indexes.size() << '\n';
     for (auto &i : indexes) output_file << i << '\n';
@@ -57,13 +58,113 @@ Table Engine::parse_table_metadata(std::filesystem::directory_entry dir) {
         int indexes;
         input_file >> indexes;
         for (int i{}; i < indexes; i++) {
-            int column_idx;
-            input_file >> column_idx;
-            table.columns[column_idx].is_index = 1;
+            std::string column_name;
+            input_file >> column_name;
+            table.columns[column_name].is_index = 1;
         }
     } else {
         std::cerr << "Unable to open metadata at: " << metadata_path.string() << std::endl;
     }
 
     return table;
+}
+
+void Engine::run(Query& query) {
+    try {
+        auto first_token = query[0];
+        switch (first_token.type) {
+            case TokenType::SELECT:
+                run_select(query);
+                break;
+            case TokenType::CREATE:
+                run_create(query);
+                break;
+            case TokenType::INSERT:
+                run_insert(query);
+                break;
+            case TokenType::DELETE:
+                run_delete(query);
+                break;    
+            default:
+                throw SyntaxError("No handler for first token with type: " + std::to_string((int)first_token.type));
+        }
+    } catch (SyntaxError error) {
+        std::cerr << error.what() << std::endl;
+        return;
+    } catch (ReferenceError error) {
+        std::cerr << error.what() << std::endl;
+        return;
+    }
+
+};
+
+QueryResult Engine::run_select(Query& query) {
+    bool all_cols = false;
+    std::vector<std::string> columns;
+    int i = 2;
+
+    if (query.size() >= 2 && query[1].type == TokenType::ASTERISK) {
+        all_cols = true;
+    }
+    if (!all_cols) {
+        if (query.size() < 2 || query[1].type != TokenType::IDENTIFIER) throw SyntaxError("No columns provided");
+        columns = {std::get<std::string>(query[1].data)};
+        for (; i < query.size(); i++) {
+            if (i % 2) {
+                if (query[i].type == TokenType::FROM) break;
+                if (query[i].type != TokenType::COMMA) throw SyntaxError("Bad columns");
+            } else {
+                if (query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Bad columns");
+                columns.push_back(std::get<std::string>(query[i].data));
+            }
+        }
+    }
+    if (i >= query.size() || query[i].type != TokenType::FROM) throw SyntaxError("Table not specified");
+    i++;
+    if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Table not specified");
+    std::string &table_name = std::get<std::string>(query[i].data);
+    auto it = tables.find(table_name);
+    if (it == tables.end()) throw ReferenceError("Table " + table_name + " does not exist");
+    Table &table = it->second;
+    if (all_cols) {
+        for (auto &[name, col] : table.columns) columns.push_back(name);
+    } else {
+        for (auto &col : columns) {
+            if (!table.columns.count(col)) throw ReferenceError("Column " + col + " does not exist in table " + table.name);
+        }
+    }
+    i++;
+    if (i < query.size()) {
+        if (query[i++].type != TokenType::WHERE) throw SyntaxError("Expected Where clause");
+        if (i >= query.size()) throw SyntaxError("Expected identifier");
+        Token &arg1 = query[i++];
+        if (i >= query.size()) throw SyntaxError("Expected operator");
+        Token &op = query[i++];
+        if (i >= query.size()) throw SyntaxError("Expected literal");
+        Token& arg2 = query[i++];
+        if (i >= query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+        if (++i < query.size()) throw SyntaxError("Expected termination");
+        auto predicate = [&]() -> std::variant<Predicate<int>, Predicate<std::string>, Predicate<bool>, Predicate<double>> {
+            switch (arg2.data.index()) {
+                case 1:
+                    return Predicate<int>(arg1, op, arg2);
+                case 2:
+                    return Predicate<std::string>(arg1, op, arg2);
+                case 3:
+                    return Predicate<bool>(arg1, op, arg2);
+                case 4:
+                    return Predicate<double>(arg1, op, arg2);
+                default:
+                    return Predicate<int>(arg1, op, arg2);
+            }
+        }();
+
+
+
+    } else {
+
+    }
+
+    
+
 }
