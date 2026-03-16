@@ -1,6 +1,7 @@
 3
 i num
-s string
 b bool
+s string
 1
-1
+num
+2

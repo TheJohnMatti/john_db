@@ -71,6 +71,7 @@ const std::unordered_map<std::string, TokenType> keyword_to_token = {
     {"AVG", TokenType::AVG},
     {"MAX", TokenType::MAX},
     {"MIN", TokenType::MIN},
+    {"WHERE", TokenType::WHERE},
 };
 
 // TODO: refactor to 256 long array with constexpr lambda
@@ -96,10 +97,10 @@ static const std::unordered_set<TokenType> literals {
     TokenType::FLOAT,
 };
 
-bool is_operator(TokenType token_type) {
+inline bool is_operator(TokenType token_type) {
     return operators.count(token_type);
 }
 
-bool is_literal(TokenType token_type) {
+inline bool is_literal(TokenType token_type) {
     return literals.count(token_type);
 }

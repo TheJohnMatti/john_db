@@ -13,9 +13,9 @@ class MemoryLayer {
     private:
     MemoryLayer();
 
-    template<typename T = nullptr_t>
+    template<typename T>
     QueryResult select_query(Table& table, std::vector<std::string>& columns, std::optional<Predicate<T>> predicate) {
-        
+
     }
 
 };

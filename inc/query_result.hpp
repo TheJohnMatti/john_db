@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -19,16 +20,16 @@ struct QueryResult {
                         std::cout << '\t';
                         break;
                     case 1:
-                        std::cout << std::get<1>(entry) << '\t';
+                        std::cout << std::get<int>(entry) << '\t';
                         break;
                     case 2:
-                        std::cout << std::get<2>(entry) << '\t';
+                        std::cout << std::get<std::string>(entry) << '\t';
                         break;    
                     case 3:
-                        std::cout << std::get<3>(entry) << '\t';
+                        std::cout << std::get<bool>(entry) << '\t';
                         break;
                     case 4:
-                        std::cout << std::get<4>(entry) << '\t';
+                        std::cout << std::get<double>(entry) << '\t';
                         break;
                     default:
                         std::cout << '\t';

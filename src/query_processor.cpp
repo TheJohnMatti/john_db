@@ -112,15 +112,15 @@ Query QueryProcessor::process(std::string_view query) {
         token_strings = get_token_strings(query);
     } catch (ParseError error) {
         std::cerr << error.what() << std::endl;
-        return;
+        return Query();
     }
-    if (!token_strings.size()) return;
+    if (!token_strings.size()) return Query();
 
     try {
         tokens = get_tokens(token_strings);
     } catch (TokenizeError error) {
         std::cerr << error.what() << std::endl;
-        return;
+        return Query();
     }
     return tokens;
 }

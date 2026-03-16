@@ -1,4 +1,5 @@
 #pragma once
+
 #include "token.hpp"
 #include "error.hpp"
 #include <unordered_set>
@@ -49,7 +50,7 @@ struct Predicate {
         this->op = op;
         this->arg2 = arg2;
         target_column = std::get<std::string>(arg1.data);
-        func = set_predicate_func();
+        func = get_predicate_func();
     }
 
     bool eval(Data &element) {

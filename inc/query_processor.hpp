@@ -11,9 +11,7 @@
 #include "engine.hpp"
 #include "token.hpp"
 #include "query_result.hpp"
-
-using QueryString = std::vector<std::string_view>;
-using Query = std::vector<Token>;
+#include "query.hpp"
 
 static constexpr std::array special = {'(', ')', ',', '=', '>', '<', ';'};
 constexpr auto special_characters = []{
@@ -25,7 +23,6 @@ constexpr auto special_characters = []{
 class QueryProcessor {
 
     private:
-    Engine &engine = Engine::instance();
     QueryString get_token_strings(std::string_view);
     Query get_tokens(QueryString);
     Token to_token(std::string_view);

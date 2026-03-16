@@ -8,6 +8,7 @@ Engine::Engine() {};
 
 void Engine::init() {
     read_tables_folder();
+    for (auto &i : tables) write_table_metadata(i.second);
 };
 
 Engine& Engine::instance() {
@@ -24,52 +25,61 @@ void Engine::read_tables_folder() {
     }
 }
 
-void Engine::write_table_metadata(Table& table) {
+void Engine::write_table_metadata(const Table& table)
+{
     std::filesystem::path path{ ".\\tables\\" + table.name };
-    if (!std::filesystem::is_directory(path)) {
+    if (!std::filesystem::is_directory(path))
         std::filesystem::create_directory(path);
-    }
-    std::filesystem::directory_entry dir{ path };
-    std::filesystem::path metadata_path{dir.path().string() + "\\metadata.data"};
+    std::filesystem::path metadata_path{ path.string() + "\\metadata.data" };
     std::ofstream output_file{ metadata_path };
-    std::vector<std::string> indexes;
     output_file << table.columns.size() << '\n';
-    for (auto &[name, column] : table.columns) {
-        if (column.is_index) indexes.push_back(name);
-        output_file << data_to_char[(size_t)column.type] << ' ' << name << '\n';
+    std::vector<std::string> indexes;
+    for (const Column& col : table.columns) {
+        output_file << data_to_char[(size_t)col.type] << ' ' << col.name << '\n';
+        if (col.is_index)
+            indexes.push_back(col.name);
     }
     output_file << indexes.size() << '\n';
-    for (auto &i : indexes) output_file << i << '\n';
+    for (auto &i : indexes)
+        output_file << i << '\n';
+    output_file << table.pages << '\n';
 }
 
-Table Engine::parse_table_metadata(std::filesystem::directory_entry dir) {
-    Table table{dir.path().filename().string()};
-    std::filesystem::path metadata_path{dir.path().string() + "\\metadata.data"};
+Table Engine::parse_table_metadata(const std::filesystem::directory_entry &dir)
+{
+    Table table{ dir.path().filename().string() };
+    std::filesystem::path metadata_path{ dir.path().string() + "\\metadata.data" };
     std::ifstream input_file{ metadata_path };
-    if (input_file.is_open()) {
-        int columns;
-        input_file >> columns;
-        for (int i{}; i < columns; i++) {
-            char col_type; 
-            std::string col_name;
-            input_file >> col_type >> col_name;
-            table.add_column(char_to_data[col_type], std::move(col_name));
-        }
-        int indexes;
-        input_file >> indexes;
-        for (int i{}; i < indexes; i++) {
-            std::string column_name;
-            input_file >> column_name;
-            table.columns[column_name].is_index = 1;
-        }
-    } else {
+    if (!input_file.is_open()) {
         std::cerr << "Unable to open metadata at: " << metadata_path.string() << std::endl;
+        return table;
+    }
+    int column_count;
+    input_file >> column_count;
+    for (int i = 0; i < column_count; i++){
+        char col_type;
+        std::string col_name;
+        input_file >> col_type >> col_name;
+        bool is_primary = (i == 0);
+        table.add_column(char_to_data[col_type], std::move(col_name), false, is_primary);
     }
 
+    int index_count;
+    input_file >> index_count;
+    for (int i = 0; i < index_count; i++) {
+        std::string column_name;
+        input_file >> column_name;
+        if (table.has_column(column_name))
+            table.get_column(column_name).is_index = true;
+    }
+    int page_count;
+    input_file >> page_count;
+    table.pages = page_count;
     return table;
 }
 
 void Engine::run(Query& query) {
+    if (query.empty()) return;
     try {
         auto first_token = query[0];
         switch (first_token.type) {
@@ -77,22 +87,22 @@ void Engine::run(Query& query) {
                 run_select(query);
                 break;
             case TokenType::CREATE:
-                run_create(query);
+                //run_create(query);
                 break;
             case TokenType::INSERT:
-                run_insert(query);
+                //run_insert(query);
                 break;
             case TokenType::DELETE:
-                run_delete(query);
+                //run_delete(query);
                 break;    
             default:
                 throw SyntaxError("No handler for first token with type: " + std::to_string((int)first_token.type));
         }
     } catch (SyntaxError error) {
-        std::cerr << error.what() << std::endl;
+        std::cerr << "Syntax error: " << error.what() << std::endl;
         return;
     } catch (ReferenceError error) {
-        std::cerr << error.what() << std::endl;
+        std::cerr << "Reference error: " << error.what() << std::endl;
         return;
     }
 
@@ -127,22 +137,22 @@ QueryResult Engine::run_select(Query& query) {
     if (it == tables.end()) throw ReferenceError("Table " + table_name + " does not exist");
     Table &table = it->second;
     if (all_cols) {
-        for (auto &[name, col] : table.columns) columns.push_back(name);
+        for (auto &col : table.columns) columns.push_back(col.name);
     } else {
         for (auto &col : columns) {
-            if (!table.columns.count(col)) throw ReferenceError("Column " + col + " does not exist in table " + table.name);
+            if (!table.has_column(col)) throw ReferenceError("Column " + col + " does not exist in table " + table.name);
         }
     }
     i++;
     if (i < query.size()) {
-        if (query[i++].type != TokenType::WHERE) throw SyntaxError("Expected Where clause");
+        if (query[i++].type != TokenType::WHERE) throw SyntaxError("Expected where clause");
         if (i >= query.size()) throw SyntaxError("Expected identifier");
         Token &arg1 = query[i++];
         if (i >= query.size()) throw SyntaxError("Expected operator");
         Token &op = query[i++];
         if (i >= query.size()) throw SyntaxError("Expected literal");
         Token& arg2 = query[i++];
-        if (i >= query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+        if (i < query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
         if (++i < query.size()) throw SyntaxError("Expected termination");
         auto predicate = [&]() -> std::variant<Predicate<int>, Predicate<std::string>, Predicate<bool>, Predicate<double>> {
             switch (arg2.data.index()) {
@@ -165,6 +175,6 @@ QueryResult Engine::run_select(Query& query) {
 
     }
 
-    
+    return QueryResult();
 
 }

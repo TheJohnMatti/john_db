@@ -29,4 +29,4 @@ constexpr std::array<DataType, 256> char_to_data = []{
     return arr;
 }();
 
-using Data = std::variant<std::monostate, std::string, int, double>;
+using Data = std::variant<std::monostate, std::string, int, bool, double>;
