@@ -22,7 +22,7 @@ class Engine {
     void write_table_metadata(const Table&);
     void run(Query&);
     QueryResult run_select(Query&);
-    //void run_create(Query&);
+    void run_create(Query&);
     //void run_insert(Query&);
     //void run_delete(Query&);
 

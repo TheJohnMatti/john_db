@@ -55,11 +55,11 @@ Token QueryProcessor::to_token(std::string_view token_string) {
     if (it != keyword_to_token.end()) 
         return Token(it->second);
     if (is_string(token_string)) 
-        return Token(TokenType::STRING, std::string(token_string.begin()+1, token_string.end()-1));
+        return Token(TokenType::STRING_LITERAL, std::string(token_string.begin()+1, token_string.end()-1));
     if (is_int(token_string)) 
-        return Token(TokenType::INT, std::stoi(std::string(token_string)));
+        return Token(TokenType::INT_LITERAL, std::stoi(std::string(token_string)));
     if (is_float(token_string)) 
-        return Token(TokenType::FLOAT, std::stod(std::string(token_string)));
+        return Token(TokenType::FLOAT_LITERAL, std::stod(std::string(token_string)));
     if (is_identifier(token_string))
         return Token(TokenType::IDENTIFIER, std::string(token_string));
     throw TokenizeError("Invalid identifier: " + std::string(token_string));
@@ -78,6 +78,7 @@ bool QueryProcessor::is_int(std::string_view token) {
 }
 
 bool QueryProcessor::is_float(std::string_view token) {
+    if (token.size() < 2) return false;
     size_t start_pos = (token[0] == '-' || token[0] == '+'); // skip leading sign
     auto i = start_pos;
     for (; i < token.size(); i++) {

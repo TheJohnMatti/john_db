@@ -5,6 +5,6 @@
 #include "table.hpp"
 
 namespace PageIO {
-    RawPage read_page(std::string&, std::string&);
-    void write_page(std::string&, std::string&, RawPage);
+    LogicalPage read_page(const std::string&, const std::string&);
+    void write_page(const std::string&, const std::string&, const LogicalPage&);
 };

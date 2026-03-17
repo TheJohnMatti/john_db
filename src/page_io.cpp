@@ -2,16 +2,16 @@
 #include <fstream>
 #include <filesystem>
 
-RawPage PageIO::read_page(std::string &table_name, std::string &page_name) {
-    RawPage result;
+LogicalPage PageIO::read_page(const std::string &table_name, const std::string &page_name) {
+    LogicalPage result;
     std::filesystem::path path{".\\tables\\" + table_name + "\\" + page_name};
     std::ifstream file(path, std::ios::in | std::ios::binary);
-    file.read(result.data, PAGE_SIZE);
+    file.read((char*)&result, PAGE_SIZE);
     return result;
 }
 
-void PageIO::write_page(std::string &table_name, std::string &page_name, RawPage page_data) {
+void PageIO::write_page(const std::string &table_name, const std::string &page_name, const LogicalPage &page_data) {
     std::filesystem::path path{".\\tables\\" + table_name + "\\" + page_name};
     std::ofstream file(path, std::ios::out | std::ios::binary);
-    file.write(page_data.data, PAGE_SIZE);
+    file.write((char*)&page_data, PAGE_SIZE);
 }

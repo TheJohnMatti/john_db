@@ -13,13 +13,6 @@
 #include "query_result.hpp"
 #include "query.hpp"
 
-static constexpr std::array special = {'(', ')', ',', '=', '>', '<', ';'};
-constexpr auto special_characters = []{
-    std::bitset<256> b{};
-    for (auto c : special) b[c] = 1;
-    return b;
-}();
-
 class QueryProcessor {
 
     private:

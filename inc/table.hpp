@@ -12,11 +12,12 @@ struct Table {
     std::string name;
     std::vector<Column> columns;
     std::unordered_map<std::string, size_t> column_index;
-    int pages;
+    size_t row_size = 0, pages = 0;
     void add_column(DataType col_type, std::string &&col_name, bool is_index=false, bool is_primary=false) {
         size_t index = columns.size();
         columns.push_back(Column{std::move(col_name), col_type, is_index, is_primary});
         column_index[columns.back().name] = index;
+        row_size += get_data_size(col_type);
     }
     bool has_column(const std::string &column_name) const {
         return column_index.count(column_name);
