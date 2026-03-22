@@ -17,7 +17,7 @@ Engine& Engine::instance() {
 }
 
 void Engine::read_tables_folder() {
-    std::filesystem::path path{ ".\\tables" };
+    std::filesystem::path path{ "tables" };
     std::filesystem::directory_iterator dir{path};
     for (auto &i : dir) {
         std::cout << i.path().filename().string() << std::endl;
@@ -26,9 +26,9 @@ void Engine::read_tables_folder() {
 }
 
 void Engine::write_table_metadata(const Table& table) {
-    std::filesystem::path path{ ".\\tables\\" + table.name };
+    std::filesystem::path path{ "tables/" + table.name };
     if (!std::filesystem::is_directory(path)) std::filesystem::create_directory(path);
-    std::filesystem::path metadata_path{ path.string() + "\\metadata.data" };
+    std::filesystem::path metadata_path{ path.string() + "/metadata.data" };
     std::ofstream output_file{ metadata_path };
     output_file << table.columns.size() << '\n';
     std::vector<std::string> indexes;
@@ -44,7 +44,7 @@ void Engine::write_table_metadata(const Table& table) {
 Table Engine::parse_table_metadata(const std::filesystem::directory_entry &dir)
 {
     Table table{ dir.path().filename().string() };
-    std::filesystem::path metadata_path{ dir.path().string() + "\\metadata.data" };
+    std::filesystem::path metadata_path{ dir.path().string() + "/metadata.data" };
     std::ifstream input_file{ metadata_path };
     if (!input_file.is_open()) {
         std::cerr << "Unable to open metadata at: " << metadata_path.string() << std::endl;
