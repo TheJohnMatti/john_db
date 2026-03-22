@@ -111,7 +111,7 @@ Query QueryProcessor::process(std::string_view query) {
 
     try {
         token_strings = get_token_strings(query);
-    } catch (ParseError error) {
+    } catch (const ParseError &error) {
         std::cerr << error.what() << std::endl;
         return Query();
     }
@@ -119,7 +119,7 @@ Query QueryProcessor::process(std::string_view query) {
 
     try {
         tokens = get_tokens(token_strings);
-    } catch (TokenizeError error) {
+    } catch (const TokenizeError &error) {
         std::cerr << error.what() << std::endl;
         return Query();
     }

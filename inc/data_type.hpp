@@ -3,9 +3,9 @@
 #include <array>
 #include <variant>
 
-// not open to reordering
 using Data = std::variant<std::monostate, std::string, int, bool, double>;
 
+// not open to reordering
 enum class DataType : uint8_t {
     UNDEFINED = 0,
     VARCHAR_16,

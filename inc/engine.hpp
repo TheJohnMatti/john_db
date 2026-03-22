@@ -8,11 +8,13 @@
 #include "query_processor.hpp"
 #include "query_result.hpp"
 #include "query.hpp"
+#include "memory_layer.hpp"
 class Engine {
 
     private:
     Engine();
     std::unordered_map<std::string, Table> tables;
+    MemoryLayer &memory_layer = MemoryLayer::instance();
 
     public:
     static Engine& instance();

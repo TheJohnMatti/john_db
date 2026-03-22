@@ -1,21 +1,21 @@
+#pragma once
+
 #include <iostream>
-#include "query_result.hpp"
 #include "table.hpp"
-#include "predicate.hpp"
-#include <vector>
-#include <optional>
 
 class MemoryLayer {
     
     public:
     static MemoryLayer &instance();
+    //void insert_query(Table &table);
 
     private:
     MemoryLayer();
 
-    template<typename T>
-    QueryResult select_query(Table& table, std::vector<std::string>& columns, std::optional<Predicate<T>> predicate) {
 
-    }
 
+    // template<typename T>
+    // QueryResult select_query(Table& table, std::vector<std::string> &columns, std::optional<Predicate<T>> predicate) {
+
+    // }
 };

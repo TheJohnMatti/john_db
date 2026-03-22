@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(MyProject LANGUAGES CXX)
+project(JohnDB LANGUAGES CXX)
 
 # Use C++23
 set(CMAKE_CXX_STANDARD 23)
@@ -16,7 +16,7 @@ set(SOURCES
     src/query_processor.cpp
     src/engine.cpp
     src/page_io.cpp
-    # src/memory_layer.cpp
+    src/memory_layer.cpp
 )
 
 # Executable

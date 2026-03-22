@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include "engine.hpp"
 #include "error.hpp"
 #include "predicate.hpp"
@@ -17,8 +18,9 @@ Engine& Engine::instance() {
 }
 
 void Engine::read_tables_folder() {
+    if (!std::filesystem::is_directory("tables")) std::filesystem::create_directory("tables");
     std::filesystem::path path{ "tables" };
-    std::filesystem::directory_iterator dir{path};
+    std::filesystem::directory_iterator dir{ path };
     for (auto &i : dir) {
         std::cout << i.path().filename().string() << std::endl;
         tables[i.path().filename().string()] = parse_table_metadata(i);
@@ -93,11 +95,14 @@ void Engine::run(Query& query) {
             default:
                 throw SyntaxError("No handler for first token with type: " + std::to_string((int)first_token.type));
         }
-    } catch (SyntaxError error) {
+    } catch (const SyntaxError &error) {
         std::cerr << "Syntax error: " << error.what() << std::endl;
         return;
-    } catch (ReferenceError error) {
+    } catch (const ReferenceError &error) {
         std::cerr << "Reference error: " << error.what() << std::endl;
+        return;
+    } catch (const LogicError &error) {
+        std::cerr << "Logic error: " << error.what() << std::endl;
         return;
     }
 
@@ -212,5 +217,36 @@ void Engine::run_create(Query &query) {
 };
 
 void Engine::run_insert(Query &query) {
+    int i = 1;
+    if (i >= query.size() || query[i++].type != TokenType::INTO) throw SyntaxError("Expected 'INTO'");
+    if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected table name");
+    std::string &table_name = std::get<std::string>(query[i].data);
+    if (!tables.count(table_name)) throw ReferenceError("Table " + table_name + " does not exist");
+    Table &target_table = tables[table_name];
+    std::vector<bool> active_index(target_table.columns.size());
+    i++;
+    if (i >= query.size() || query[i++].type != TokenType::OPEN_PAREN) throw SyntaxError("Expected opening parentheses");
+    if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected column name");
+    std::string &first_column = std::get<std::string>(query[i].data);
+    if (!target_table.column_index.count(first_column)) throw ReferenceError("Column " + first_column + " does not exist in table " + table_name);
+    active_index[target_table.column_index[first_column]] = 1;
+    for (; i < query.size(); i++) {
+        if (i % 2 == 0) {
+            if (query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected column name");
+            std::string &column_name = std::get<std::string>(query[i].data);
+            if (!target_table.column_index.count(column_name)) throw ReferenceError("Column " + first_column + " does not exist in table " + table_name);
+            int idx = target_table.column_index[column_name];
+            if (active_index[idx]) throw LogicError("Cannot duplicate column " + column_name);
+            active_index[idx] = true;
+        } else {
+            if (query[i].type == TokenType::CLOSE_PAREN) break;
+            if (query[i].type != TokenType::COMMA) throw SyntaxError("Expected comma or closing parentheses");
+        }
+    }
+    if (i++ == query.size()) throw SyntaxError("Expected closing parentheses");
+    // TODO: remove when null enabled
+    for (auto i : active_index) if (i == false) throw LogicError("All columns must be specified");
+    if (i >= query.size() || query[i++].type != TokenType::VALUES) throw SyntaxError("Expected 'VALUES'");
+    
 
 }

@@ -34,6 +34,7 @@ enum class TokenType {
     STRING,
     INT,
     FLOAT,
+    VALUES,
 
     // literals start
     STRING_LITERAL,
@@ -89,6 +90,7 @@ inline const std::unordered_map<std::string, TokenType> keyword_to_token = {
     {"STRING", TokenType::STRING},
     {"INT", TokenType::INT},
     {"FLOAT", TokenType::FLOAT},
+    {"VALUES", TokenType::VALUES},
 };
 
 // TODO: refactor to 256 long array with constexpr lambda
