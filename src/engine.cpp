@@ -76,7 +76,7 @@ Table Engine::parse_table_metadata(const std::filesystem::directory_entry &dir)
 void Engine::run(Query& query) {
     if (query.empty()) return;
     try {
-        auto first_token = query[0];
+        auto &first_token = query[0];
         switch (first_token.type) {
             case TokenType::SELECT:
                 run_select(query);
@@ -85,7 +85,7 @@ void Engine::run(Query& query) {
                 run_create(query);
                 break;
             case TokenType::INSERT:
-                //run_insert(query);
+                run_insert(query);
                 break;
             case TokenType::DELETE:
                 //run_delete(query);
@@ -139,7 +139,7 @@ QueryResult Engine::run_select(Query& query) {
         }
     }
     i++;
-    if (i < query.size()) {
+    if (i < query.size() && query[i].type != TokenType::SEMICOLON) {
         if (query[i++].type != TokenType::WHERE) throw SyntaxError("Expected where clause");
         if (i >= query.size()) throw SyntaxError("Expected identifier");
         Token &arg1 = query[i++];
@@ -207,6 +207,10 @@ void Engine::run_create(Query &query) {
     if (query[i-1].type != TokenType::CLOSE_PAREN) throw SyntaxError("Bad columns");
     if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected termination");
     if (i < query.size()) throw SyntaxError("Expected termination");
-    tables.insert({new_table.name, new_table});
+    tables.insert({ new_table.name, new_table });
     write_table_metadata(new_table);
 };
+
+void Engine::run_insert(Query &query) {
+
+}

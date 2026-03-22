@@ -63,7 +63,7 @@ struct Token {
     Token(TokenType type, Data data) : type{type}, data{data} {}
 };
 
-const std::unordered_map<std::string, TokenType> keyword_to_token = {
+inline const std::unordered_map<std::string, TokenType> keyword_to_token = {
     {"SELECT", TokenType::SELECT},
     {"INSERT", TokenType::INSERT},
     {"UPDATE", TokenType::UPDATE},
@@ -92,7 +92,7 @@ const std::unordered_map<std::string, TokenType> keyword_to_token = {
 };
 
 // TODO: refactor to 256 long array with constexpr lambda
-const std::unordered_map<char, TokenType> special_char_to_token = {
+inline const std::unordered_map<char, TokenType> special_char_to_token = {
     {':', TokenType::COLON},
     {';', TokenType::SEMICOLON},
     {',', TokenType::COMMA},
@@ -105,7 +105,7 @@ const std::unordered_map<char, TokenType> special_char_to_token = {
 };
 
 static constexpr std::array special = {'(', ')', ',', '=', '>', '<', ';', '*', ':'};
-constexpr auto special_characters = []{
+inline constexpr auto special_characters = []{
     std::bitset<256> b{};
     for (auto c : special) b[c] = 1;
     return b;
