@@ -1,0 +1,26 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create build directory
+      run: mkdir -p build
+      shell: bash
+    
+    - name: Configure CMake
+      working-directory: build
+      run: cmake ..
+    
+    - name: Build project
+      working-directory: build
+      run: cmake --build .
