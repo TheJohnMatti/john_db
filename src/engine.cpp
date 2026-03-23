@@ -104,6 +104,9 @@ void Engine::run(Query& query) {
     } catch (const LogicError &error) {
         std::cerr << "Logic error: " << error.what() << std::endl;
         return;
+    } catch (const TypeError &error) {
+        std::cerr << "Type error: " << error.what() << std::endl;
+        return;
     }
 
 };
@@ -224,29 +227,56 @@ void Engine::run_insert(Query &query) {
     if (!tables.count(table_name)) throw ReferenceError("Table " + table_name + " does not exist");
     Table &target_table = tables[table_name];
     std::vector<bool> active_index(target_table.columns.size());
+    std::vector<int> index_order;
     i++;
     if (i >= query.size() || query[i++].type != TokenType::OPEN_PAREN) throw SyntaxError("Expected opening parentheses");
     if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected column name");
     std::string &first_column = std::get<std::string>(query[i].data);
     if (!target_table.column_index.count(first_column)) throw ReferenceError("Column " + first_column + " does not exist in table " + table_name);
-    active_index[target_table.column_index[first_column]] = 1;
+    int idx = target_table.column_index[first_column];
+    active_index[idx] = true;
+    index_order.push_back(idx);
+    i++;
+    int parity = i % 2;
     for (; i < query.size(); i++) {
-        if (i % 2 == 0) {
+        if (i % 2 == parity) {
+            if (query[i].type == TokenType::CLOSE_PAREN) break;
+            if (query[i].type != TokenType::COMMA) throw SyntaxError("Expected comma or closing parentheses");
+        } else {
             if (query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected column name");
             std::string &column_name = std::get<std::string>(query[i].data);
             if (!target_table.column_index.count(column_name)) throw ReferenceError("Column " + first_column + " does not exist in table " + table_name);
             int idx = target_table.column_index[column_name];
             if (active_index[idx]) throw LogicError("Cannot duplicate column " + column_name);
             active_index[idx] = true;
-        } else {
-            if (query[i].type == TokenType::CLOSE_PAREN) break;
-            if (query[i].type != TokenType::COMMA) throw SyntaxError("Expected comma or closing parentheses");
+            index_order.push_back(idx);
         }
     }
     if (i++ == query.size()) throw SyntaxError("Expected closing parentheses");
     // TODO: remove when null enabled
     for (auto i : active_index) if (i == false) throw LogicError("All columns must be specified");
     if (i >= query.size() || query[i++].type != TokenType::VALUES) throw SyntaxError("Expected 'VALUES'");
-    
+    if (i >= query.size() || query[i++].type != TokenType::OPEN_PAREN) throw SyntaxError("Expected opening parentheses");
+    std::vector<Data> values;
+    if (i >= query.size() || !is_literal(query[i].type)) throw SyntaxError("Expected literal");
+    if (data_index_to_data_type(query[i].data) != target_table.columns[index_order[0]].type) throw TypeError("Wrong type for value at index 0");
+    values.push_back(query[i].data);
+    i++;
+    int starting_index = i-1;
+    parity = i % 2;
+    for (; i < query.size(); i++) {
+        if (i % 2 == parity) {
+            if (query[i].type == TokenType::CLOSE_PAREN) break;
+            if (query[i].type != TokenType::COMMA) throw SyntaxError("Expected comma or closing parentheses");
+        } else {
+            if (!is_literal(query[i].type)) throw SyntaxError("Expected literal");
+            int idx = (i-starting_index)/2;
+            if (data_index_to_data_type(query[i].data) != target_table.columns[index_order[idx]].type) throw TypeError("Wrong type for value at index " + std::to_string(idx));
+            values.push_back(query[i].data);
+        }
+    }
+    if (i >= query.size() || query[i++].type != TokenType::CLOSE_PAREN) throw SyntaxError("Expected closing parentheses");
+    if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+    if (i < query.size()) throw SyntaxError("Expected termination");
 
 }
