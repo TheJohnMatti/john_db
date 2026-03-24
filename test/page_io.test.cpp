@@ -7,7 +7,7 @@
 
 int main() {
 
-    RawPage page_data;
+    LogicalPage page_data;
     std::iota(page_data.data, page_data.data+PAGE_SIZE, 0);
 
     std::string table_name = "test_table", page_name = "test_page";
