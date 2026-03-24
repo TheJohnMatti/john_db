@@ -54,8 +54,10 @@ Token QueryProcessor::to_token(std::string_view token_string) {
     auto it = keyword_to_token.find(uppercase_token_string);
     if (it != keyword_to_token.end()) 
         return Token(it->second);
-    if (is_string(token_string)) 
+    if (is_string(token_string)) {
+        if (token_string.size() > MAX_STRING_SIZE + 2) throw TokenizeError("Strings longer than " + std::to_string(MAX_STRING_SIZE) + " are not supported.");
         return Token(TokenType::STRING_LITERAL, std::string(token_string.begin()+1, token_string.end()-1));
+    }
     if (is_int(token_string)) 
         return Token(TokenType::INT_LITERAL, std::stoi(std::string(token_string)));
     if (is_float(token_string)) 

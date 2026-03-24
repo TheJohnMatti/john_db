@@ -20,8 +20,6 @@ class Engine {
     static Engine& instance();
     void init();
     void read_tables_folder();
-    Table parse_table_metadata(const std::filesystem::directory_entry&);
-    void write_table_metadata(const Table&);
     void run(Query&);
     QueryResult run_select(Query&);
     void run_create(Query&);

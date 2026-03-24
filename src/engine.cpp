@@ -9,7 +9,7 @@ Engine::Engine() {};
 
 void Engine::init() {
     read_tables_folder();
-    for (auto &i : tables) write_table_metadata(i.second);
+    for (auto &i : tables) i.second.write_table_metadata();
 };
 
 Engine& Engine::instance() {
@@ -23,56 +23,8 @@ void Engine::read_tables_folder() {
     std::filesystem::directory_iterator dir{ path };
     for (auto &i : dir) {
         std::cout << i.path().filename().string() << std::endl;
-        tables[i.path().filename().string()] = parse_table_metadata(i);
+        tables[i.path().filename().string()] = Table::parse_table_metadata(i);
     }
-}
-
-void Engine::write_table_metadata(const Table& table) {
-    std::filesystem::path path{ "tables/" + table.name };
-    if (!std::filesystem::is_directory(path)) std::filesystem::create_directory(path);
-    std::filesystem::path metadata_path{ path.string() + "/metadata.data" };
-    std::ofstream output_file{ metadata_path };
-    output_file << table.columns.size() << '\n';
-    std::vector<std::string> indexes;
-    for (const Column& col : table.columns) {
-        output_file << data_to_char[(size_t)col.type] << ' ' << col.name << '\n';
-        if (col.is_index) indexes.push_back(col.name);
-    }
-    output_file << indexes.size() << '\n';
-    for (auto &i : indexes) output_file << i << '\n';
-    output_file << table.pages << '\n';
-}
-
-Table Engine::parse_table_metadata(const std::filesystem::directory_entry &dir)
-{
-    Table table{ dir.path().filename().string() };
-    std::filesystem::path metadata_path{ dir.path().string() + "/metadata.data" };
-    std::ifstream input_file{ metadata_path };
-    if (!input_file.is_open()) {
-        std::cerr << "Unable to open metadata at: " << metadata_path.string() << std::endl;
-        return table;
-    }
-    int column_count;
-    input_file >> column_count;
-    for (int i = 0; i < column_count; i++){
-        char col_type;
-        std::string col_name;
-        input_file >> col_type >> col_name;
-        bool is_primary = (i == 0);
-        table.add_column(char_to_data[col_type], std::move(col_name), false, is_primary);
-    }
-    int index_count;
-    input_file >> index_count;
-    for (int i = 0; i < index_count; i++) {
-        std::string column_name;
-        input_file >> column_name;
-        if (table.has_column(column_name))
-            table.get_column(column_name).is_index = true;
-    }
-    int page_count;
-    input_file >> page_count;
-    table.pages = page_count;
-    return table;
 }
 
 void Engine::run(Query& query) {
@@ -216,7 +168,7 @@ void Engine::run_create(Query &query) {
     if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected termination");
     if (i < query.size()) throw SyntaxError("Expected termination");
     tables.insert({ new_table.name, new_table });
-    write_table_metadata(new_table);
+    new_table.write_table_metadata();
 };
 
 void Engine::run_insert(Query &query) {
@@ -278,5 +230,9 @@ void Engine::run_insert(Query &query) {
     if (i >= query.size() || query[i++].type != TokenType::CLOSE_PAREN) throw SyntaxError("Expected closing parentheses");
     if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
     if (i < query.size()) throw SyntaxError("Expected termination");
-
+    std::vector<Data> ordered_columns(active_index.size());
+    for (int i{}; i < active_index.size(); i++) {
+        ordered_columns[index_order[i]] = values[i];
+    }
+    memory_layer.insert(target_table, ordered_columns);
 }

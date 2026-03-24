@@ -11,6 +11,6 @@ constexpr size_t SLOT_SPACE = PAGE_SIZE - sizeof(std::bitset<MAX_OCCUPANCY>);
 constexpr size_t MIN_ROW_SIZE = (SLOT_SPACE - 1 + MAX_OCCUPANCY) / MAX_OCCUPANCY;
 
 struct LogicalPage {
-    std::bitset<MAX_OCCUPANCY> occupancy;
-    char data[SLOT_SPACE];
+    std::bitset<MAX_OCCUPANCY> occupancy{};
+    char data[SLOT_SPACE] = {};
 };
