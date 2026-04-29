@@ -20,10 +20,10 @@ struct QueryResult {
                         std::cout << '\t';
                         break;
                     case 1:
-                        std::cout << std::get<int>(entry) << '\t';
+                        std::cout << std::get<std::string>(entry) << '\t';
                         break;
                     case 2:
-                        std::cout << std::get<std::string>(entry) << '\t';
+                        std::cout << std::get<int>(entry) << '\t';
                         break;    
                     case 3:
                         std::cout << std::get<bool>(entry) << '\t';

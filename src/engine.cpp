@@ -63,11 +63,10 @@ void Engine::run(Query& query) {
 
 };
 
-QueryResult Engine::run_select(Query& query) {
+void Engine::run_select(Query& query) {
     bool all_cols = false;
     std::vector<std::string> columns;
     int i = 2;
-
     if (query.size() >= 2 && query[1].type == TokenType::ASTERISK) {
         all_cols = true;
     }
@@ -101,15 +100,15 @@ QueryResult Engine::run_select(Query& query) {
     i++;
     if (i < query.size() && query[i].type != TokenType::SEMICOLON) {
         if (query[i++].type != TokenType::WHERE) throw SyntaxError("Expected where clause");
-        if (i >= query.size()) throw SyntaxError("Expected identifier");
+        if (i >= query.size() || !is_identifier(query[i].type)) throw SyntaxError("Expected identifier");
         Token &arg1 = query[i++];
-        if (i >= query.size()) throw SyntaxError("Expected operator");
+        if (i >= query.size() || !is_operator(query[i].type)) throw SyntaxError("Expected operator");
         Token &op = query[i++];
-        if (i >= query.size()) throw SyntaxError("Expected literal");
+        if (i >= query.size() || !is_literal(query[i].type)) throw SyntaxError("Expected literal");
         Token& arg2 = query[i++];
         if (i < query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
         if (++i < query.size()) throw SyntaxError("Expected termination");
-        auto predicate = [&]() -> std::variant<Predicate<int>, Predicate<std::string>, Predicate<bool>, Predicate<double>> {
+        auto predicate = [&]() -> VariablePredicate {
             switch (arg2.data.index()) {
                 case 1:
                     return Predicate<int>(arg1, op, arg2);
@@ -123,14 +122,13 @@ QueryResult Engine::run_select(Query& query) {
                     return Predicate<int>(arg1, op, arg2);
             }
         }();
-
-
-
+        memory_layer.select(table, columns, predicate);
     } else {
-
+        if (i < query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+        if (++i < query.size()) throw SyntaxError("Expected termination");
+        VariablePredicate predicate = NullPredicate{};
+        memory_layer.select(table, columns, predicate);
     }
-
-    return QueryResult();
 
 }
 

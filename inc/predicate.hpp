@@ -58,3 +58,11 @@ struct Predicate {
     }
 
 };
+
+struct NullPredicate {
+    bool eval(Data &) {
+        return true;
+    }
+};
+
+using VariablePredicate = std::variant<Predicate<int>, Predicate<std::string>, Predicate<bool>, Predicate<double>, NullPredicate>;

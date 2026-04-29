@@ -8,6 +8,7 @@ LogicalPage PageIO::read_page(const std::string &table_name, const std::string &
     LogicalPage result;
     std::filesystem::path path{ "tables/" + table_name + "/" + "page_" + page_name + ".data" };
     std::ifstream file(path, std::ios::in | std::ios::binary);
+    if (!file.is_open()) return result;
     file.read((char*)&result, PAGE_SIZE);
     return result;
 }
