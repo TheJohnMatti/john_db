@@ -15,6 +15,7 @@ class MemoryLayer {
     void insert(Table &table, std::vector<Data> &values);
     bool insert_at(Table &table, std::vector<Data> &values, const size_t page_index);
     void select(Table &table, std::vector<std::string> cols, VariablePredicate &pred);
+    size_t remove(Table &table, VariablePredicate &pred);
 
     private:
     MemoryLayer();

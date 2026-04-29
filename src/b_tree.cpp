@@ -60,6 +60,10 @@ bool BTree::contains(uint64_t key) const {
     }
 }
 
+bool BTree::remove(uint64_t key) {
+    return remove_from_node(root_node_id, key);
+}
+
 std::string BTree::get_node_path(uint64_t node_id) const {
     return tree_directory + "/" + tree_name + "/node_" + std::to_string(node_id) + ".data";
 }
@@ -147,4 +151,50 @@ void BTree::insert_non_full(uint64_t node_id, uint64_t key, uint64_t value) {
         }
         insert_non_full(node.children[i], key, value);
     }
+}
+
+bool BTree::remove_from_node(uint64_t node_id, uint64_t key) {
+    BTreeNode node = read_node(node_id);
+    uint32_t i = 0;
+    while (i < node.count && key > node.keys[i]) {
+        i++;
+    }
+
+    if (i < node.count && node.keys[i] == key) {
+        if (node.is_leaf) {
+            for (uint32_t j = i + 1; j < node.count; j++) {
+                node.keys[j - 1] = node.keys[j];
+                node.children[j - 1] = node.children[j];
+            }
+            node.count--;
+            write_node(node_id, node);
+            return true;
+        }
+
+        uint64_t replacement_key = remove_max(node.children[i]);
+        node.keys[i] = replacement_key;
+        write_node(node_id, node);
+        return true;
+    }
+
+    if (node.is_leaf) {
+        return false;
+    }
+
+    return remove_from_node(node.children[i], key);
+}
+
+uint64_t BTree::remove_max(uint64_t node_id) {
+    BTreeNode node = read_node(node_id);
+    if (node.is_leaf) {
+        if (node.count == 0) {
+            throw std::runtime_error("Cannot remove max from empty B-tree node");
+        }
+        uint64_t key = node.keys[node.count - 1];
+        node.count--;
+        write_node(node_id, node);
+        return key;
+    }
+
+    return remove_max(node.children[node.count]);
 }

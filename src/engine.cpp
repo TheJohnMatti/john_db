@@ -22,6 +22,9 @@ void Engine::read_tables_folder() {
     std::filesystem::path path{ "tables" };
     std::filesystem::directory_iterator dir{ path };
     for (auto &i : dir) {
+        if (!i.is_directory()) {
+            continue;
+        }
         std::cout << i.path().filename().string() << std::endl;
         tables[i.path().filename().string()] = Table::parse_table_metadata(i);
     }
@@ -42,7 +45,7 @@ void Engine::run(Query& query) {
                 run_insert(query);
                 break;
             case TokenType::DELETE:
-                //run_delete(query);
+                run_delete(query);
                 break;    
             default:
                 throw SyntaxError("No handler for first token with type: " + std::to_string((int)first_token.type));
@@ -106,8 +109,8 @@ void Engine::run_select(Query& query) {
         Token &op = query[i++];
         if (i >= query.size() || !is_literal(query[i].type)) throw SyntaxError("Expected literal");
         Token& arg2 = query[i++];
-        if (i < query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
-        if (++i < query.size()) throw SyntaxError("Expected termination");
+        if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+        if (i < query.size()) throw SyntaxError("Expected termination");
         auto predicate = [&]() -> VariablePredicate {
             switch (arg2.data.index()) {
                 case 1:
@@ -124,8 +127,8 @@ void Engine::run_select(Query& query) {
         }();
         memory_layer.select(table, columns, predicate);
     } else {
-        if (i < query.size() && query[i].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
-        if (++i < query.size()) throw SyntaxError("Expected termination");
+        if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+        if (i < query.size()) throw SyntaxError("Expected termination");
         VariablePredicate predicate = NullPredicate{};
         memory_layer.select(table, columns, predicate);
     }
@@ -163,10 +166,11 @@ void Engine::run_create(Query &query) {
         }
     }
     if (query[i-1].type != TokenType::CLOSE_PAREN) throw SyntaxError("Bad columns");
-    if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected termination");
+    if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
     if (i < query.size()) throw SyntaxError("Expected termination");
-    tables.insert({ new_table.name, std::move(new_table) });
-    new_table.write_table_metadata();
+    const std::string persisted_name = new_table.name;
+    tables.insert({ persisted_name, std::move(new_table) });
+    tables.at(persisted_name).write_table_metadata();
 };
 
 void Engine::run_insert(Query &query) {
@@ -226,7 +230,7 @@ void Engine::run_insert(Query &query) {
         }
     }
     if (i >= query.size() || query[i++].type != TokenType::CLOSE_PAREN) throw SyntaxError("Expected closing parentheses");
-    if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+    if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
     if (i < query.size()) throw SyntaxError("Expected termination");
     std::vector<Data> ordered_columns(active_index.size());
     for (int i{}; i < active_index.size(); i++) {
@@ -237,4 +241,44 @@ void Engine::run_insert(Query &query) {
     } catch (const std::runtime_error& e) {
         std::cerr << "Insert failed: " << e.what() << std::endl;
     }
+}
+
+void Engine::run_delete(Query &query) {
+    int i = 1;
+    if (i >= query.size() || query[i++].type != TokenType::FROM) throw SyntaxError("Expected 'FROM'");
+    if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) throw SyntaxError("Expected table name");
+    std::string &table_name = std::get<std::string>(query[i++].data);
+    auto it = tables.find(table_name);
+    if (it == tables.end()) throw ReferenceError("Table " + table_name + " does not exist");
+    Table &table = it->second;
+
+    VariablePredicate predicate = NullPredicate{};
+    if (i < query.size() && query[i].type == TokenType::WHERE) {
+        i++;
+        if (i >= query.size() || !is_identifier(query[i].type)) throw SyntaxError("Expected identifier");
+        Token &arg1 = query[i++];
+        if (i >= query.size() || !is_operator(query[i].type)) throw SyntaxError("Expected operator");
+        Token &op = query[i++];
+        if (i >= query.size() || !is_literal(query[i].type)) throw SyntaxError("Expected literal");
+        Token &arg2 = query[i++];
+        predicate = [&]() -> VariablePredicate {
+            switch (arg2.data.index()) {
+                case 1:
+                    return Predicate<std::string>(arg1, op, arg2);
+                case 2:
+                    return Predicate<int>(arg1, op, arg2);
+                case 3:
+                    return Predicate<bool>(arg1, op, arg2);
+                case 4:
+                    return Predicate<double>(arg1, op, arg2);
+                default:
+                    return Predicate<int>(arg1, op, arg2);
+            }
+        }();
+    }
+    if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected semicolon");
+    if (i < query.size()) throw SyntaxError("Expected termination");
+
+    size_t removed = memory_layer.remove(table, predicate);
+    std::cout << "Deleted " << removed << " rows" << std::endl;
 }

@@ -24,6 +24,6 @@ class Engine {
     void run_select(Query&);
     void run_create(Query&);
     void run_insert(Query&);
-    //void run_delete(Query&);
+    void run_delete(Query&);
 
 };

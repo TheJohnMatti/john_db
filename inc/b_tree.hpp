@@ -35,9 +35,12 @@ private:
     uint64_t allocate_node_id() const;
     void split_child(uint64_t parent_id, uint32_t child_index);
     void insert_non_full(uint64_t node_id, uint64_t key, uint64_t value);
+    bool remove_from_node(uint64_t node_id, uint64_t key);
+    uint64_t remove_max(uint64_t node_id);
 public:
     BTree(const std::string &name, std::string directory_path);
     void insert(uint64_t key, uint64_t value);
     uint64_t search(uint64_t key) const;
     bool contains(uint64_t key) const;
+    bool remove(uint64_t key);
 };
