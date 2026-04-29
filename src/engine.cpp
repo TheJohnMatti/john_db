@@ -165,7 +165,7 @@ void Engine::run_create(Query &query) {
     if (query[i-1].type != TokenType::CLOSE_PAREN) throw SyntaxError("Bad columns");
     if (i < query.size() && query[i++].type != TokenType::SEMICOLON) throw SyntaxError("Expected termination");
     if (i < query.size()) throw SyntaxError("Expected termination");
-    tables.insert({ new_table.name, new_table });
+    tables.insert({ new_table.name, std::move(new_table) });
     new_table.write_table_metadata();
 };
 
@@ -232,5 +232,9 @@ void Engine::run_insert(Query &query) {
     for (int i{}; i < active_index.size(); i++) {
         ordered_columns[index_order[i]] = values[i];
     }
-    memory_layer.insert(target_table, ordered_columns);
+    try {
+        memory_layer.insert(target_table, ordered_columns);
+    } catch (const std::runtime_error& e) {
+        std::cerr << "Insert failed: " << e.what() << std::endl;
+    }
 }

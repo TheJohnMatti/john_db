@@ -26,6 +26,22 @@ bool MemoryLayer::insert_at(Table &table, std::vector<Data> &values, const size_
 }
 
 void MemoryLayer::insert(Table &table, std::vector<Data> &values) {
+    if (!values.empty() && table.primary_key_btree) {
+        uint64_t pk_value = 0;
+        const Data& pk_data = values[0];
+        if (std::holds_alternative<int>(pk_data)) {
+            pk_value = static_cast<uint64_t>(std::get<int>(pk_data));
+        } else if (std::holds_alternative<std::string>(pk_data)) {
+            throw std::runtime_error("String primary keys not supported yet");
+        } else {
+            throw std::runtime_error("Unsupported primary key type");
+        }
+        if (table.primary_key_btree->contains(pk_value)) {
+            throw std::runtime_error("Primary key already exists");
+        }
+        table.primary_key_btree->insert(pk_value, 0);
+    }
+
     size_t page_count = table.pages;
     for (size_t i{0}; i < page_count; i++) {
         if (insert_at(table, values, i)) return;
