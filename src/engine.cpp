@@ -111,9 +111,9 @@ void Engine::run_select(Query& query) {
         auto predicate = [&]() -> VariablePredicate {
             switch (arg2.data.index()) {
                 case 1:
-                    return Predicate<int>(arg1, op, arg2);
-                case 2:
                     return Predicate<std::string>(arg1, op, arg2);
+                case 2:
+                    return Predicate<int>(arg1, op, arg2);
                 case 3:
                     return Predicate<bool>(arg1, op, arg2);
                 case 4:
