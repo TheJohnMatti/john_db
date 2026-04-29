@@ -17,6 +17,7 @@ set(SOURCES
     src/engine.cpp
     src/page_io.cpp
     src/memory_layer.cpp
+    src/b_tree.cpp
 )
 
 # Executable

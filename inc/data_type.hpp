@@ -83,10 +83,12 @@ inline void write_to_bytes(Data &data, char *dest) {
         case 3: {
             bool bool_val = std::get<bool>(data);
             std::memcpy(dest, &bool_val, sizeof(bool));
+            break;
         }
         case 4: {
             double double_val = std::get<double>(data);
             std::memcpy(dest, &double_val, sizeof(double));
+            break;
         }
         default:
             break;

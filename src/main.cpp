@@ -33,7 +33,7 @@ int main() {
             print_options();
             continue;
         }
-        Query tokens = processor.process(std::string_view(query));
+        Query tokens = processor.process(query);
         engine.run(tokens);
     
     }

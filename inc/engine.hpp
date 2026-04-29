@@ -21,7 +21,7 @@ class Engine {
     void init();
     void read_tables_folder();
     void run(Query&);
-    QueryResult run_select(Query&);
+    void run_select(Query&);
     void run_create(Query&);
     void run_insert(Query&);
     //void run_delete(Query&);

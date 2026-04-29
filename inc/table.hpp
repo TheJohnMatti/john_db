@@ -6,15 +6,20 @@
 #include <unordered_set>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include "column.hpp"
+#include "b_tree.hpp"
 
 struct Table {
     Table() : name{"unnamed_table"} {}
-    Table(std::string name) : name{std::move(name)} {}
+    Table(std::string name)
+        : name{std::move(name)},
+          primary_key_btree{std::make_unique<BTree>("primary_key", "tables/" + this->name + "/btrees")} {}
     std::string name;
     std::vector<Column> columns;
     std::unordered_map<std::string, size_t> column_index;
     size_t row_size = 0, pages = 0;
+    std::unique_ptr<BTree> primary_key_btree;
     void add_column(DataType col_type, std::string &&col_name, bool is_index=false, bool is_primary=false) {
         size_t index = columns.size();
         columns.push_back(Column{std::move(col_name), col_type, is_index, is_primary});

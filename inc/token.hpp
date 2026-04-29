@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <array>
+#include <bitset>
 #include <unordered_map>
 #include "data_type.hpp"
 #include "error.hpp"
@@ -131,6 +133,10 @@ static const std::unordered_set<TokenType> literals {
 
 inline bool is_literal(TokenType token_type) {
     return literals.count(token_type);
+}
+
+inline bool is_identifier(TokenType token_type) {
+    return token_type == TokenType::IDENTIFIER;
 }
 
 static const std::unordered_set<TokenType> types {
