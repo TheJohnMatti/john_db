@@ -21,6 +21,7 @@ class Engine {
     void init();
     void read_tables_folder();
     void run(Query&);
+    void run_query(std::string_view query);
     void run_select(Query&);
     void run_create(Query&);
     void run_insert(Query&);

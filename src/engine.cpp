@@ -68,8 +68,15 @@ void Engine::run(Query& query) {
         std::cerr << "Type error: " << error.what() << std::endl;
         return;
     }
+}
 
-};
+void Engine::run_query(std::string_view query) {
+    QueryProcessor processor;
+    Query tokens = processor.process(query);
+    if (tokens.empty()) return;
+    run(tokens);
+}
+
 
 void Engine::run_select(Query& query) {
     bool all_cols = false;

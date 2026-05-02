@@ -16,28 +16,47 @@ void unpack_row_locator(uint64_t packed, size_t &page_idx, size_t &slot_idx) {
     slot_idx = static_cast<size_t>(static_cast<uint32_t>(packed & 0xffffffffull));
 }
 
-bool int_pk_equality_fast_path(const Table &table, const VariablePredicate &pred, int &pk_out) {
+bool pk_equality_fast_path(const Table &table, const VariablePredicate &pred, uint64_t &pk_out) {
     if (!table.primary_key_btree || table.columns.empty()) {
         return false;
     }
-    if (table.columns[0].type != DataType::INT) {
+    size_t pk_idx = table.get_primary_key_index();
+    DataType pk_type = table.columns[pk_idx].type;
+    if (pred.index() != static_cast<size_t>(pk_type)) {
         return false;
     }
-    if (pred.index() != 0) {
-        return false;
+    bool is_equal = false;
+    switch (pk_type) {
+        case DataType::INT: {
+            const auto &p = std::get<Predicate<int>>(pred);
+            if (p.op.type != TokenType::EQUAL) return false;
+            if (table.get_column_index(p.target_column) != pk_idx) return false;
+            if (!std::holds_alternative<int>(p.arg2.data)) return false;
+            pk_out = static_cast<uint64_t>(std::get<int>(p.arg2.data));
+            is_equal = true;
+            break;
+        }
+        case DataType::VARCHAR_16: {
+            // For strings, we can't easily hash to uint64_t, so skip for now
+            return false;
+        }
+        case DataType::BOOL: {
+            const auto &p = std::get<Predicate<bool>>(pred);
+            if (p.op.type != TokenType::EQUAL) return false;
+            if (table.get_column_index(p.target_column) != pk_idx) return false;
+            if (!std::holds_alternative<bool>(p.arg2.data)) return false;
+            pk_out = static_cast<uint64_t>(std::get<bool>(p.arg2.data));
+            is_equal = true;
+            break;
+        }
+        case DataType::FLOAT: {
+            // Floats are tricky for equality, skip
+            return false;
+        }
+        default:
+            return false;
     }
-    const auto &p = std::get<Predicate<int>>(pred);
-    if (p.op.type != TokenType::EQUAL) {
-        return false;
-    }
-    if (table.get_column_index(p.target_column) != 0) {
-        return false;
-    }
-    if (!std::holds_alternative<int>(p.arg2.data)) {
-        return false;
-    }
-    pk_out = std::get<int>(p.arg2.data);
-    return true;
+    return is_equal;
 }
 
 } // namespace
@@ -75,6 +94,8 @@ void MemoryLayer::insert(Table &table, std::vector<Data> &values) {
         const Data &pk_data = values[0];
         if (std::holds_alternative<int>(pk_data)) {
             pk_value = static_cast<uint64_t>(std::get<int>(pk_data));
+        } else if (std::holds_alternative<bool>(pk_data)) {
+            pk_value = static_cast<uint64_t>(std::get<bool>(pk_data));
         } else if (std::holds_alternative<std::string>(pk_data)) {
             throw std::runtime_error("String primary keys not supported yet");
         } else {
@@ -211,12 +232,11 @@ void MemoryLayer::select(Table &table, std::vector<std::string> cols, VariablePr
     };
     const size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
 
-    int pk_lookup = 0;
-    if (has_predicate && int_pk_equality_fast_path(table, pred, pk_lookup)) {
-        const uint64_t key_u = static_cast<uint64_t>(pk_lookup);
-        if (table.primary_key_btree->contains(key_u)) {
+    uint64_t pk_lookup = 0;
+    if (has_predicate && pk_equality_fast_path(table, pred, pk_lookup)) {
+        if (table.primary_key_btree->contains(pk_lookup)) {
             try {
-                const uint64_t packed = table.primary_key_btree->search(key_u);
+                const uint64_t packed = table.primary_key_btree->search(pk_lookup);
                 size_t page_idx = 0;
                 size_t slot_idx = 0;
                 unpack_row_locator(packed, page_idx, slot_idx);
@@ -225,9 +245,12 @@ void MemoryLayer::select(Table &table, std::vector<std::string> cols, VariablePr
                     if (page.occupancy[slot_idx]) {
                         const size_t row_start = slot_idx * table.row_size;
                         if (row_start + table.row_size <= SLOT_SPACE) {
-                            const Data pk_val =
-                                read_data(DataType::INT, page.data + row_start + column_offsets[0]);
-                            if (std::holds_alternative<int>(pk_val) && std::get<int>(pk_val) == pk_lookup) {
+                            // For simplicity, assume pk is int for now, but can generalize
+                            Data pk_val = read_data(table.columns[table.get_primary_key_index()].type, page.data + row_start + column_offsets[table.get_primary_key_index()]);
+                            bool pk_matches = false;
+                            if (std::holds_alternative<int>(pk_val) && static_cast<uint64_t>(std::get<int>(pk_val)) == pk_lookup) pk_matches = true;
+                            else if (std::holds_alternative<bool>(pk_val) && static_cast<uint64_t>(std::get<bool>(pk_val)) == pk_lookup) pk_matches = true;
+                            if (pk_matches) {
                                 Data predicate_value = std::monostate{};
                                 const size_t pred_off = column_offsets[predicate_column_index];
                                 if (row_start + pred_off + get_data_size(table.columns[predicate_column_index].type)
@@ -370,12 +393,11 @@ size_t MemoryLayer::remove(Table &table, VariablePredicate &pred) {
 
     const size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
 
-    int pk_lookup = 0;
-    if (has_predicate && int_pk_equality_fast_path(table, pred, pk_lookup)) {
-        const uint64_t key_u = static_cast<uint64_t>(pk_lookup);
-        if (table.primary_key_btree->contains(key_u)) {
+    uint64_t pk_lookup = 0;
+    if (has_predicate && pk_equality_fast_path(table, pred, pk_lookup)) {
+        if (table.primary_key_btree->contains(pk_lookup)) {
             try {
-                const uint64_t packed = table.primary_key_btree->search(key_u);
+                const uint64_t packed = table.primary_key_btree->search(pk_lookup);
                 size_t page_idx = 0;
                 size_t slot_idx = 0;
                 unpack_row_locator(packed, page_idx, slot_idx);
@@ -384,9 +406,11 @@ size_t MemoryLayer::remove(Table &table, VariablePredicate &pred) {
                     if (page.occupancy[slot_idx]) {
                         const size_t row_start = slot_idx * table.row_size;
                         if (row_start + table.row_size <= SLOT_SPACE) {
-                            const Data pk_val =
-                                read_data(DataType::INT, page.data + row_start + column_offsets[0]);
-                            if (std::holds_alternative<int>(pk_val) && std::get<int>(pk_val) == pk_lookup) {
+                            Data pk_val = read_data(table.columns[table.get_primary_key_index()].type, page.data + row_start + column_offsets[table.get_primary_key_index()]);
+                            bool pk_matches = false;
+                            if (std::holds_alternative<int>(pk_val) && static_cast<uint64_t>(std::get<int>(pk_val)) == pk_lookup) pk_matches = true;
+                            else if (std::holds_alternative<bool>(pk_val) && static_cast<uint64_t>(std::get<bool>(pk_val)) == pk_lookup) pk_matches = true;
+                            if (pk_matches) {
                                 Data predicate_value = std::monostate{};
                                 const size_t pred_off = column_offsets[predicate_column_index];
                                 if (row_start + pred_off + get_data_size(table.columns[predicate_column_index].type)
@@ -396,7 +420,7 @@ size_t MemoryLayer::remove(Table &table, VariablePredicate &pred) {
                                 }
                                 if (std::visit([&](auto &typed_pred) { return typed_pred.eval(predicate_value); },
                                                pred)) {
-                                    table.primary_key_btree->remove(key_u);
+                                    table.primary_key_btree->remove(pk_lookup);
                                     page.occupancy[slot_idx] = 0;
                                     PageIO::write_page(table.name, page_idx, page);
                                     return 1;

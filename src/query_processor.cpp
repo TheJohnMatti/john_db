@@ -24,6 +24,13 @@ QueryString QueryProcessor::get_token_strings(std::string_view query) {
             i = j + 1;
             continue;
         }
+        if (query[i] == '<' || query[i] == '>') {
+            if (i + 1 < query.size() && query[i + 1] == '=') {
+                res.push_back(query.substr(i, 2));
+                i += 2;
+                continue;
+            }
+        }
         if (special_characters[query[i]]) {
             res.push_back(query.substr(i++, 1));
             continue;
@@ -51,6 +58,10 @@ Token QueryProcessor::to_token(std::string_view token_string) {
     }
     std::string uppercase_token_string(token_string.begin(), token_string.end());
     std::transform(token_string.begin(), token_string.end(), uppercase_token_string.begin(), ::toupper);
+    if (uppercase_token_string == "TRUE") return Token(TokenType::BOOL_LITERAL, true);
+    if (uppercase_token_string == "FALSE") return Token(TokenType::BOOL_LITERAL, false);
+    if (uppercase_token_string == ">=") return Token(TokenType::GREATERTHANOREQUAL);
+    if (uppercase_token_string == "<=") return Token(TokenType::LESSTHANOREQUAL);
     auto it = keyword_to_token.find(uppercase_token_string);
     if (it != keyword_to_token.end()) 
         return Token(it->second);

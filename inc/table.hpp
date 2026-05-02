@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -36,6 +37,12 @@ struct Table {
     }
     size_t get_column_index(const std::string &name) const {
         return column_index.at(name);
+    }
+    size_t get_primary_key_index() const {
+        for (size_t i = 0; i < columns.size(); ++i) {
+            if (columns[i].is_primary) return i;
+        }
+        return 0; // fallback
     }
     void write_table_metadata() {
         const std::filesystem::path path = std::filesystem::path("tables") / name;

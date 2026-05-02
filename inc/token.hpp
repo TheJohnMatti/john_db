@@ -36,12 +36,14 @@ enum class TokenType {
     STRING,
     INT,
     FLOAT,
+    BOOL,
     VALUES,
 
     // literals start
     STRING_LITERAL,
     INT_LITERAL,
     FLOAT_LITERAL,
+    BOOL_LITERAL,
     
     // special characters start
     COLON,
@@ -50,6 +52,8 @@ enum class TokenType {
     GREATERTHAN,
     EQUAL,
     LESSTHAN,
+    LESSTHANOREQUAL,
+    GREATERTHANOREQUAL,
     ASTERISK,
     OPEN_PAREN,
     CLOSE_PAREN,
@@ -92,6 +96,7 @@ inline const std::unordered_map<std::string, TokenType> keyword_to_token = {
     {"STRING", TokenType::STRING},
     {"INT", TokenType::INT},
     {"FLOAT", TokenType::FLOAT},
+    {"BOOL", TokenType::BOOL},
     {"VALUES", TokenType::VALUES},
 };
 
@@ -119,6 +124,8 @@ static const std::unordered_set<TokenType> operators {
     TokenType::LESSTHAN,
     TokenType::EQUAL,
     TokenType::GREATERTHAN,
+    TokenType::LESSTHANOREQUAL,
+    TokenType::GREATERTHANOREQUAL,
 };
 
 inline bool is_operator(TokenType token_type) {
@@ -129,6 +136,7 @@ static const std::unordered_set<TokenType> literals {
     TokenType::STRING_LITERAL,
     TokenType::INT_LITERAL,
     TokenType::FLOAT_LITERAL,
+    TokenType::BOOL_LITERAL,
 };
 
 inline bool is_literal(TokenType token_type) {
@@ -143,6 +151,7 @@ static const std::unordered_set<TokenType> types {
     TokenType::STRING,
     TokenType::INT,
     TokenType::FLOAT,
+    TokenType::BOOL,
 };
 
 inline bool is_type(TokenType token_type) {
@@ -153,6 +162,7 @@ inline bool is_type(TokenType token_type) {
 static const std::unordered_map<TokenType, DataType> __token_to_type = {
     {TokenType::STRING, DataType::VARCHAR_16},
     {TokenType::INT, DataType::INT},
+    {TokenType::BOOL, DataType::BOOL},
     {TokenType::FLOAT, DataType::FLOAT},
 };
 

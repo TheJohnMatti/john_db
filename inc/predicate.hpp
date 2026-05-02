@@ -12,9 +12,19 @@ static PredicateFunc less_than = [](Data &el1, Data &el2) {
     return std::get<T>(el1) < std::get<T>(el2);
 };
 
+template<typename T>
+static PredicateFunc less_than_or_equal = [](Data &el1, Data &el2) {
+    return std::get<T>(el1) <= std::get<T>(el2);
+};
+
 template<typename T> 
 static PredicateFunc greater_than = [](Data &el1, Data &el2) {
     return std::get<T>(el1) > std::get<T>(el2);
+};
+
+template<typename T>
+static PredicateFunc greater_than_or_equal = [](Data &el1, Data &el2) {
+    return std::get<T>(el1) >= std::get<T>(el2);
 };
 
 template<typename T>
@@ -33,8 +43,12 @@ struct Predicate {
         switch (op.type) {
             case TokenType::LESSTHAN:
                 return less_than<T>;
+            case TokenType::LESSTHANOREQUAL:
+                return less_than_or_equal<T>;
             case TokenType::GREATERTHAN:
                 return greater_than<T>;
+            case TokenType::GREATERTHANOREQUAL:
+                return greater_than_or_equal<T>;
             case TokenType::EQUAL:
                 return equal_to<T>;
             default:
