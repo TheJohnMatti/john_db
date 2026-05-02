@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 #include "engine.hpp"
 #include "error.hpp"
 #include "predicate.hpp"
@@ -46,7 +47,10 @@ void Engine::run(Query& query) {
                 break;
             case TokenType::DELETE:
                 run_delete(query);
-                break;    
+                break;
+            case TokenType::DROP:
+                run_drop(query);
+                break;
             default:
                 throw SyntaxError("No handler for first token with type: " + std::to_string((int)first_token.type));
         }
@@ -281,4 +285,33 @@ void Engine::run_delete(Query &query) {
 
     size_t removed = memory_layer.remove(table, predicate);
     std::cout << "Deleted " << removed << " rows" << std::endl;
+}
+
+void Engine::run_drop(Query &query) {
+    int i = 1;
+    if (i >= query.size() || query[i++].type != TokenType::TABLE) {
+        throw SyntaxError("Expected TABLE");
+    }
+    if (i >= query.size() || query[i].type != TokenType::IDENTIFIER) {
+        throw SyntaxError("Expected table name");
+    }
+    const std::string &table_name = std::get<std::string>(query[i++].data);
+    if (i >= query.size() || query[i++].type != TokenType::SEMICOLON) {
+        throw SyntaxError("Expected semicolon");
+    }
+    if (i < query.size()) {
+        throw SyntaxError("Expected termination");
+    }
+    if (tables.find(table_name) == tables.end()) {
+        throw ReferenceError("Table " + table_name + " does not exist");
+    }
+    const std::filesystem::path table_dir = std::filesystem::path("tables") / table_name;
+    std::error_code ec;
+    std::uintmax_t removed = std::filesystem::remove_all(table_dir, ec);
+    (void)removed;
+    if (ec) {
+        throw LogicError("Failed to remove table data: " + ec.message());
+    }
+    tables.erase(table_name);
+    std::cout << "Dropped table " << table_name << std::endl;
 }
