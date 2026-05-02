@@ -22,3 +22,16 @@ set(SOURCES
 
 # Executable
 add_executable(main ${SOURCES})
+
+# --- Tests (CTest) ---
+enable_testing()
+
+function(johndb_add_test_simple name)
+    add_executable(${name} ${ARGN})
+    target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/inc)
+    add_test(NAME ${name} COMMAND ${name} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endfunction()
+
+johndb_add_test_simple(test_b_tree test/b_tree.test.cpp src/b_tree.cpp)
+johndb_add_test_simple(test_query_processor test/query_processor.test.cpp src/query_processor.cpp)
+johndb_add_test_simple(test_page_io test/page_io.test.cpp src/page_io.cpp)
