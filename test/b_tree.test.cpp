@@ -156,21 +156,20 @@ void test_boundary_equals_separator() {
     cleanup(root);
 }
 
-// Second BTree open on same directory only works while root stays node 0 (no root split yet).
-// Root / next-id persistence is not implemented; keep this small (< BTREE_MAX_KEYS inserts on root).
-void test_reopen_same_directory_small_tree() {
+// Verify BTree root and allocation metadata persist when reopening after splits.
+void test_reopen_same_directory_split_tree() {
     const std::filesystem::path root = make_unique_test_root();
     std::filesystem::create_directories(root / "t");
     const std::string dir = btree_dir(root, "t");
     {
         BTree tree("pk", dir);
-        for (int i = 0; i < 30; ++i) {
+        for (int i = 0; i < 1200; ++i) {
             tree.insert(static_cast<uint64_t>(i), static_cast<uint64_t>(i) + 1000u);
         }
     }
     {
         BTree tree2("pk", dir);
-        for (int i = 0; i < 30; ++i) {
+        for (int i = 0; i < 1200; ++i) {
             assert_true(tree2.contains(static_cast<uint64_t>(i)), "reopen contains");
             assert_true(tree2.search(static_cast<uint64_t>(i)) == static_cast<uint64_t>(i) + 1000u,
                         "reopen search");
@@ -191,7 +190,7 @@ int main() {
     test_remove_all_then_empty();
     test_sparse_keys();
     test_boundary_equals_separator();
-    test_reopen_same_directory_small_tree();
+    test_reopen_same_directory_split_tree();
     std::cout << "All B+ tree tests passed.\n";
     return 0;
 }

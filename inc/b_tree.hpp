@@ -28,17 +28,21 @@ private:
     std::string tree_name;
     std::string tree_directory;
     uint64_t root_node_id;
+    uint64_t next_node_id;
     std::filesystem::path get_node_path(uint64_t node_id) const;
+    std::filesystem::path get_metadata_path() const;
     void ensure_btree_dir() const;
     BTreeNode read_node(uint64_t node_id) const;
     void write_node(uint64_t node_id, const BTreeNode &node) const;
-    uint64_t allocate_node_id() const;
-    void split_child(uint64_t parent_id, uint32_t child_index);
-    void insert_non_full(uint64_t node_id, uint64_t key, uint64_t value);
-    bool remove_from_node(uint64_t node_id, uint64_t key);
+    void read_metadata();
+    void write_metadata() const;
+    uint64_t allocate_node_id();
     static uint32_t internal_child_index(const BTreeNode &node, uint64_t key);
     static uint64_t leaf_next(const BTreeNode &node);
     static void set_leaf_next(BTreeNode &node, uint64_t next_id);
+    void split_child(uint64_t parent_id, uint32_t child_index);
+    void insert_non_full(uint64_t node_id, uint64_t key, uint64_t value);
+    bool remove_from_node(uint64_t node_id, uint64_t key);
 public:
     BTree(const std::string &name, std::string directory_path);
     void insert(uint64_t key, uint64_t value);
