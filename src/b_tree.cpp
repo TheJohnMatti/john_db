@@ -1,6 +1,83 @@
 #include "b_tree.hpp"
 
 #include <utility>
+#include <unordered_set>
+
+namespace {
+
+uint64_t infer_root_node_id(const std::filesystem::path &node_dir) {
+    std::unordered_set<uint64_t> node_ids;
+    std::unordered_set<uint64_t> referenced_ids;
+    std::filesystem::directory_iterator it(node_dir);
+    for (const auto &entry : it) {
+        if (!entry.is_regular_file()) continue;
+        const std::string filename = entry.path().filename().string();
+        const std::string prefix = "node_";
+        const std::string suffix = ".data";
+        if (filename.rfind(prefix, 0) != 0 || filename.size() <= prefix.size() + suffix.size()) continue;
+        const std::string id_str = filename.substr(prefix.size(), filename.size() - prefix.size() - suffix.size());
+        try {
+            const uint64_t node_id = std::stoull(id_str);
+            node_ids.insert(node_id);
+        } catch (...) {
+            continue;
+        }
+    }
+    if (node_ids.empty()) {
+        return 0;
+    }
+    for (uint64_t node_id : node_ids) {
+        const std::filesystem::path path = node_dir / ("node_" + std::to_string(node_id) + ".data");
+        std::ifstream file(path, std::ios::binary);
+        if (!file.is_open()) continue;
+        BTreeNode node{};
+        file.read(reinterpret_cast<char *>(&node), sizeof(BTreeNode));
+        if (!node.is_leaf) {
+            for (uint32_t i = 0; i <= node.count; ++i) {
+                referenced_ids.insert(node.children[i]);
+            }
+        } else {
+            const uint64_t next_id = node.children[BTREE_MAX_KEYS];
+            if (next_id != 0) {
+                referenced_ids.insert(next_id);
+            }
+        }
+    }
+    uint64_t root_candidate = 0;
+    bool found_root = false;
+    for (uint64_t node_id : node_ids) {
+        if (!referenced_ids.count(node_id)) {
+            if (!found_root || node_id < root_candidate) {
+                root_candidate = node_id;
+                found_root = true;
+            }
+        }
+    }
+    return found_root ? root_candidate : 0;
+}
+
+uint64_t infer_next_node_id(const std::filesystem::path &node_dir) {
+    uint64_t max_id = 0;
+    bool any = false;
+    for (const auto &entry : std::filesystem::directory_iterator(node_dir)) {
+        if (!entry.is_regular_file()) continue;
+        const std::string filename = entry.path().filename().string();
+        const std::string prefix = "node_";
+        const std::string suffix = ".data";
+        if (filename.rfind(prefix, 0) != 0 || filename.size() <= prefix.size() + suffix.size()) continue;
+        const std::string id_str = filename.substr(prefix.size(), filename.size() - prefix.size() - suffix.size());
+        try {
+            const uint64_t node_id = std::stoull(id_str);
+            max_id = std::max(max_id, node_id);
+            any = true;
+        } catch (...) {
+            continue;
+        }
+    }
+    return any ? max_id + 1 : 1;
+}
+
+} // namespace
 
 uint32_t BTree::internal_child_index(const BTreeNode &node, uint64_t key) {
     uint32_t i = 0;
@@ -19,17 +96,27 @@ void BTree::set_leaf_next(BTreeNode &node, uint64_t next_id) {
 }
 
 BTree::BTree(const std::string &name, std::string directory_path)
-    : tree_name(name), tree_directory(std::move(directory_path)), root_node_id(0) {
+    : tree_name(name), tree_directory(std::move(directory_path)), root_node_id(0), next_node_id(1) {
     ensure_btree_dir();
-    const std::filesystem::path root_path = get_node_path(root_node_id);
-    if (std::filesystem::exists(root_path)) {
-        (void)read_node(root_node_id);
+    const std::filesystem::path metadata_path = get_metadata_path();
+    if (std::filesystem::exists(metadata_path)) {
+        read_metadata();
     } else {
-        BTreeNode root{};
-        root.is_leaf = 1;
-        root.count = 0;
-        set_leaf_next(root, 0);
-        write_node(root_node_id, root);
+        const std::filesystem::path node_dir = std::filesystem::path(tree_directory) / tree_name;
+        const std::filesystem::path root_path = get_node_path(root_node_id);
+        if (std::filesystem::exists(root_path)) {
+            root_node_id = infer_root_node_id(node_dir);
+            next_node_id = infer_next_node_id(node_dir);
+            write_metadata();
+        } else {
+            BTreeNode root{};
+            root.is_leaf = 1;
+            root.count = 0;
+            set_leaf_next(root, 0);
+            write_node(root_node_id, root);
+            next_node_id = 1;
+            write_metadata();
+        }
     }
 }
 
@@ -43,6 +130,7 @@ void BTree::insert(uint64_t key, uint64_t value) {
         new_root.children[0] = root_node_id;
         write_node(new_root_id, new_root);
         root_node_id = new_root_id;
+        write_metadata();
         split_child(new_root_id, 0);
         insert_non_full(new_root_id, key, value);
     } else {
@@ -86,11 +174,37 @@ std::filesystem::path BTree::get_node_path(uint64_t node_id) const {
            / ("node_" + std::to_string(node_id) + ".data");
 }
 
+std::filesystem::path BTree::get_metadata_path() const {
+    return std::filesystem::path(tree_directory) / tree_name / "metadata.data";
+}
+
 void BTree::ensure_btree_dir() const {
     const std::filesystem::path dir = std::filesystem::path(tree_directory) / tree_name;
     if (!std::filesystem::is_directory(dir)) {
         std::filesystem::create_directories(dir);
     }
+}
+
+void BTree::read_metadata() {
+    const std::filesystem::path metadata_path = get_metadata_path();
+    std::ifstream file(metadata_path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to read B-tree metadata: " + metadata_path.string());
+    }
+    file >> root_node_id >> next_node_id;
+    if (!file || next_node_id == 0) {
+        throw std::runtime_error("Invalid B-tree metadata: " + metadata_path.string());
+    }
+}
+
+void BTree::write_metadata() const {
+    const std::filesystem::path metadata_path = get_metadata_path();
+    std::ofstream file(metadata_path);
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to write B-tree metadata: " + metadata_path.string());
+    }
+    file << root_node_id << '\n';
+    file << next_node_id << '\n';
 }
 
 BTreeNode BTree::read_node(uint64_t node_id) const {
@@ -111,9 +225,10 @@ void BTree::write_node(uint64_t node_id, const BTreeNode &node) const {
     file.close();
 }
 
-uint64_t BTree::allocate_node_id() const {
-    static uint64_t next_id = 1;
-    return next_id++;
+uint64_t BTree::allocate_node_id() {
+    const uint64_t node_id = next_node_id++;
+    write_metadata();
+    return node_id;
 }
 
 void BTree::split_child(uint64_t parent_id, uint32_t child_index) {
