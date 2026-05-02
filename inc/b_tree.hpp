@@ -9,9 +9,9 @@
 #include <filesystem>
 #include <string>
 
-constexpr size_t BTREE_PAGE_SIZE = 4096;
-constexpr size_t BTREE_MAX_KEYS = 127;
-constexpr size_t BTREE_MIN_KEYS = 63;
+constexpr size_t BTREE_PAGE_SIZE = 8192;
+constexpr size_t BTREE_MAX_KEYS = 255;
+constexpr size_t BTREE_MIN_KEYS = 127;
 
 struct BTreeNode {
     uint32_t count;
@@ -36,7 +36,9 @@ private:
     void split_child(uint64_t parent_id, uint32_t child_index);
     void insert_non_full(uint64_t node_id, uint64_t key, uint64_t value);
     bool remove_from_node(uint64_t node_id, uint64_t key);
-    uint64_t remove_max(uint64_t node_id);
+    static uint32_t internal_child_index(const BTreeNode &node, uint64_t key);
+    static uint64_t leaf_next(const BTreeNode &node);
+    static void set_leaf_next(BTreeNode &node, uint64_t next_id);
 public:
     BTree(const std::string &name, std::string directory_path);
     void insert(uint64_t key, uint64_t value);

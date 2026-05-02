@@ -2,16 +2,33 @@
 
 #include <utility>
 
+uint32_t BTree::internal_child_index(const BTreeNode &node, uint64_t key) {
+    uint32_t i = 0;
+    while (i < node.count && key >= node.keys[i]) {
+        ++i;
+    }
+    return i;
+}
+
+uint64_t BTree::leaf_next(const BTreeNode &node) {
+    return node.children[BTREE_MAX_KEYS];
+}
+
+void BTree::set_leaf_next(BTreeNode &node, uint64_t next_id) {
+    node.children[BTREE_MAX_KEYS] = next_id;
+}
+
 BTree::BTree(const std::string &name, std::string directory_path)
     : tree_name(name), tree_directory(std::move(directory_path)), root_node_id(0) {
     ensure_btree_dir();
-    std::filesystem::path root_path = get_node_path(root_node_id);
+    const std::filesystem::path root_path = get_node_path(root_node_id);
     if (std::filesystem::exists(root_path)) {
-        BTreeNode existing_root = read_node(root_node_id);
+        (void)read_node(root_node_id);
     } else {
         BTreeNode root{};
         root.is_leaf = 1;
         root.count = 0;
+        set_leaf_next(root, 0);
         write_node(root_node_id, root);
     }
 }
@@ -19,7 +36,7 @@ BTree::BTree(const std::string &name, std::string directory_path)
 void BTree::insert(uint64_t key, uint64_t value) {
     BTreeNode root = read_node(root_node_id);
     if (root.count == BTREE_MAX_KEYS) {
-        uint64_t new_root_id = allocate_node_id();
+        const uint64_t new_root_id = allocate_node_id();
         BTreeNode new_root{};
         new_root.is_leaf = 0;
         new_root.count = 0;
@@ -35,19 +52,19 @@ void BTree::insert(uint64_t key, uint64_t value) {
 
 uint64_t BTree::search(uint64_t key) const {
     uint64_t node_id = root_node_id;
-    while (true) {
-        BTreeNode node = read_node(node_id);
-        uint32_t i = 0;
-        while (i < node.count && key > node.keys[i]) {
-            i++;
-        }
-        if (i < node.count && key == node.keys[i]) {
-            return node.children[i];
-        }
+    for (;;) {
+        const BTreeNode node = read_node(node_id);
         if (node.is_leaf) {
+            uint32_t i = 0;
+            while (i < node.count && key > node.keys[i]) {
+                ++i;
+            }
+            if (i < node.count && node.keys[i] == key) {
+                return node.children[i];
+            }
             throw std::runtime_error("Key not found in B-tree");
         }
-        node_id = node.children[i];
+        node_id = node.children[internal_child_index(node, key)];
     }
 }
 
@@ -78,47 +95,63 @@ void BTree::ensure_btree_dir() const {
 
 BTreeNode BTree::read_node(uint64_t node_id) const {
     BTreeNode node{};
-    std::filesystem::path path = get_node_path(node_id);
+    const std::filesystem::path path = get_node_path(node_id);
     std::ifstream file(path, std::ios::binary);
     if (file.is_open()) {
-        file.read((char*)&node, sizeof(BTreeNode));
+        file.read(reinterpret_cast<char *>(&node), sizeof(BTreeNode));
         file.close();
     }
     return node;
 }
 
 void BTree::write_node(uint64_t node_id, const BTreeNode &node) const {
-    std::filesystem::path path = get_node_path(node_id);
+    const std::filesystem::path path = get_node_path(node_id);
     std::ofstream file(path, std::ios::binary);
-    file.write((char*)&node, sizeof(BTreeNode));
+    file.write(reinterpret_cast<const char *>(&node), sizeof(BTreeNode));
     file.close();
 }
 
 uint64_t BTree::allocate_node_id() const {
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
 }
 
 void BTree::split_child(uint64_t parent_id, uint32_t child_index) {
     BTreeNode parent = read_node(parent_id);
-    uint64_t left_child_id = parent.children[child_index];
+    const uint64_t left_child_id = parent.children[child_index];
     BTreeNode left_child = read_node(left_child_id);
-    uint64_t right_child_id = allocate_node_id();
+    const uint64_t right_child_id = allocate_node_id();
     BTreeNode right_child{};
     right_child.is_leaf = left_child.is_leaf;
-    right_child.count = BTREE_MIN_KEYS;
-    std::copy(left_child.keys + BTREE_MIN_KEYS + 1, left_child.keys + left_child.count, right_child.keys);
-    if (!left_child.is_leaf) {
-        std::copy(left_child.children + BTREE_MIN_KEYS + 1, left_child.children + left_child.count + 1, right_child.children);
+
+    if (left_child.is_leaf) {
+        right_child.count = BTREE_MAX_KEYS - BTREE_MIN_KEYS;
+        std::copy(left_child.keys + BTREE_MIN_KEYS, left_child.keys + BTREE_MAX_KEYS, right_child.keys);
+        std::copy(left_child.children + BTREE_MIN_KEYS, left_child.children + BTREE_MAX_KEYS,
+                  right_child.children);
+        set_leaf_next(right_child, leaf_next(left_child));
+        set_leaf_next(left_child, right_child_id);
+
+        parent.keys[child_index] = left_child.keys[BTREE_MIN_KEYS];
+        left_child.count = BTREE_MIN_KEYS;
+    } else {
+        right_child.count = BTREE_MIN_KEYS;
+        std::copy(left_child.keys + BTREE_MIN_KEYS + 1, left_child.keys + left_child.count, right_child.keys);
+        std::copy(left_child.children + BTREE_MIN_KEYS + 1, left_child.children + left_child.count + 1,
+                  right_child.children);
+        set_leaf_next(right_child, 0);
+
+        left_child.count = BTREE_MIN_KEYS;
+        parent.keys[child_index] = left_child.keys[BTREE_MIN_KEYS];
     }
-    left_child.count = BTREE_MIN_KEYS;
+
     for (uint32_t i = parent.count; i > child_index; i--) {
         parent.keys[i] = parent.keys[i - 1];
         parent.children[i + 1] = parent.children[i];
     }
-    parent.keys[child_index] = left_child.keys[BTREE_MIN_KEYS];
     parent.children[child_index + 1] = right_child_id;
     parent.count++;
+
     write_node(parent_id, parent);
     write_node(left_child_id, left_child);
     write_node(right_child_id, right_child);
@@ -126,8 +159,8 @@ void BTree::split_child(uint64_t parent_id, uint32_t child_index) {
 
 void BTree::insert_non_full(uint64_t node_id, uint64_t key, uint64_t value) {
     BTreeNode node = read_node(node_id);
-    uint32_t i = node.count;
     if (node.is_leaf) {
+        uint32_t i = node.count;
         while (i > 0 && node.keys[i - 1] > key) {
             node.keys[i] = node.keys[i - 1];
             node.children[i] = node.children[i - 1];
@@ -137,32 +170,31 @@ void BTree::insert_non_full(uint64_t node_id, uint64_t key, uint64_t value) {
         node.children[i] = value;
         node.count++;
         write_node(node_id, node);
-    } else {
-        while (i > 0 && node.keys[i - 1] > key) {
-            i--;
-        }
-        uint64_t child_id = node.children[i];
-        BTreeNode child = read_node(child_id);
-        if (child.count == BTREE_MAX_KEYS) {
-            split_child(node_id, i);
-            node = read_node(node_id);
-            if (key > node.keys[i]) {
-                i++;
-            }
-        }
-        insert_non_full(node.children[i], key, value);
+        return;
     }
+
+    uint32_t i = internal_child_index(node, key);
+    uint64_t child_id = node.children[i];
+    BTreeNode child = read_node(child_id);
+    if (child.count == BTREE_MAX_KEYS) {
+        split_child(node_id, i);
+        node = read_node(node_id);
+        if (i < node.count && key >= node.keys[i]) {
+            ++i;
+        }
+        child_id = node.children[i];
+    }
+    insert_non_full(child_id, key, value);
 }
 
 bool BTree::remove_from_node(uint64_t node_id, uint64_t key) {
     BTreeNode node = read_node(node_id);
-    uint32_t i = 0;
-    while (i < node.count && key > node.keys[i]) {
-        i++;
-    }
-
-    if (i < node.count && node.keys[i] == key) {
-        if (node.is_leaf) {
+    if (node.is_leaf) {
+        uint32_t i = 0;
+        while (i < node.count && key > node.keys[i]) {
+            ++i;
+        }
+        if (i < node.count && node.keys[i] == key) {
             for (uint32_t j = i + 1; j < node.count; j++) {
                 node.keys[j - 1] = node.keys[j];
                 node.children[j - 1] = node.children[j];
@@ -171,31 +203,9 @@ bool BTree::remove_from_node(uint64_t node_id, uint64_t key) {
             write_node(node_id, node);
             return true;
         }
-
-        uint64_t replacement_key = remove_max(node.children[i]);
-        node.keys[i] = replacement_key;
-        write_node(node_id, node);
-        return true;
-    }
-
-    if (node.is_leaf) {
         return false;
     }
 
+    const uint32_t i = internal_child_index(node, key);
     return remove_from_node(node.children[i], key);
-}
-
-uint64_t BTree::remove_max(uint64_t node_id) {
-    BTreeNode node = read_node(node_id);
-    if (node.is_leaf) {
-        if (node.count == 0) {
-            throw std::runtime_error("Cannot remove max from empty B-tree node");
-        }
-        uint64_t key = node.keys[node.count - 1];
-        node.count--;
-        write_node(node_id, node);
-        return key;
-    }
-
-    return remove_max(node.children[node.count]);
 }

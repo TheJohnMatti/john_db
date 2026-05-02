@@ -1,34 +1,78 @@
 #include "memory_layer.hpp"
 #include "predicate.hpp"
+#include "token.hpp"
 #include <cstring>
 #include <type_traits>
 
+namespace {
+
+uint64_t pack_row_locator(size_t page_idx, size_t slot_idx) {
+    return (static_cast<uint64_t>(page_idx) << 32)
+           | static_cast<uint64_t>(static_cast<uint32_t>(slot_idx));
+}
+
+void unpack_row_locator(uint64_t packed, size_t &page_idx, size_t &slot_idx) {
+    page_idx = static_cast<size_t>(packed >> 32);
+    slot_idx = static_cast<size_t>(static_cast<uint32_t>(packed & 0xffffffffull));
+}
+
+bool int_pk_equality_fast_path(const Table &table, const VariablePredicate &pred, int &pk_out) {
+    if (!table.primary_key_btree || table.columns.empty()) {
+        return false;
+    }
+    if (table.columns[0].type != DataType::INT) {
+        return false;
+    }
+    if (pred.index() != 0) {
+        return false;
+    }
+    const auto &p = std::get<Predicate<int>>(pred);
+    if (p.op.type != TokenType::EQUAL) {
+        return false;
+    }
+    if (table.get_column_index(p.target_column) != 0) {
+        return false;
+    }
+    if (!std::holds_alternative<int>(p.arg2.data)) {
+        return false;
+    }
+    pk_out = std::get<int>(p.arg2.data);
+    return true;
+}
+
+} // namespace
+
 MemoryLayer::MemoryLayer() {}
 
-bool MemoryLayer::insert_at(Table &table, std::vector<Data> &values, const size_t page_index) {
+std::optional<std::pair<size_t, size_t>> MemoryLayer::try_insert_at(Table &table, std::vector<Data> &values,
+                                                                   size_t page_index) {
     LogicalPage page = PageIO::read_page(table.name, page_index);
     auto &occupancy_bits = page.occupancy;
-    size_t entries = occupancy_bits.count(), max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
-    if (entries >= max_occupancy) return false;
+    const size_t entries = occupancy_bits.count();
+    const size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
+    if (entries >= max_occupancy) {
+        return std::nullopt;
+    }
     for (size_t j{0}; j < max_occupancy; j++) {
         if (!occupancy_bits[j]) {
             occupancy_bits[j] = 1;
             size_t starting_byte = j * table.row_size;
             for (size_t col{0}; col < table.columns.size(); col++) {
-                write_to_bytes(values[col], page.data+starting_byte);
+                write_to_bytes(values[col], page.data + starting_byte);
                 starting_byte += get_data_size(table.columns[col].type);
             }
             PageIO::write_page(table.name, page_index, page);
-            return true;
+            return std::pair<size_t, size_t>{page_index, j};
         }
     }
-    return false;
+    return std::nullopt;
 }
 
 void MemoryLayer::insert(Table &table, std::vector<Data> &values) {
-    if (!values.empty() && table.primary_key_btree) {
-        uint64_t pk_value = 0;
-        const Data& pk_data = values[0];
+    uint64_t pk_value = 0;
+    const bool btree_pk = !values.empty() && table.primary_key_btree;
+    if (btree_pk) {
+        const Data &pk_data = values[0];
         if (std::holds_alternative<int>(pk_data)) {
             pk_value = static_cast<uint64_t>(std::get<int>(pk_data));
         } else if (std::holds_alternative<std::string>(pk_data)) {
@@ -39,17 +83,27 @@ void MemoryLayer::insert(Table &table, std::vector<Data> &values) {
         if (table.primary_key_btree->contains(pk_value)) {
             throw std::runtime_error("Primary key already exists");
         }
-        table.primary_key_btree->insert(pk_value, 0);
     }
 
-    size_t page_count = table.pages;
+    const size_t page_count = table.pages;
     for (size_t i{0}; i < page_count; i++) {
-        if (insert_at(table, values, i)) return;
+        if (auto loc = try_insert_at(table, values, i)) {
+            if (btree_pk) {
+                table.primary_key_btree->insert(pk_value, pack_row_locator(loc->first, loc->second));
+            }
+            return;
+        }
     }
     table.pages++;
     table.write_table_metadata();
     PageIO::create_page(table.name, page_count);
-    insert_at(table, values, page_count);
+    if (auto loc = try_insert_at(table, values, page_count)) {
+        if (btree_pk) {
+            table.primary_key_btree->insert(pk_value, pack_row_locator(loc->first, loc->second));
+        }
+        return;
+    }
+    throw std::runtime_error("Failed to insert row into new page");
 }
 
 void MemoryLayer::select(Table &table, std::vector<std::string> cols, VariablePredicate &pred) {
@@ -155,7 +209,56 @@ void MemoryLayer::select(Table &table, std::vector<std::string> cols, VariablePr
                 return Data{std::monostate{}};
         }
     };
-    size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
+    const size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
+
+    int pk_lookup = 0;
+    if (has_predicate && int_pk_equality_fast_path(table, pred, pk_lookup)) {
+        const uint64_t key_u = static_cast<uint64_t>(pk_lookup);
+        if (table.primary_key_btree->contains(key_u)) {
+            try {
+                const uint64_t packed = table.primary_key_btree->search(key_u);
+                size_t page_idx = 0;
+                size_t slot_idx = 0;
+                unpack_row_locator(packed, page_idx, slot_idx);
+                if (page_idx < table.pages && slot_idx < max_occupancy) {
+                    LogicalPage page = PageIO::read_page(table.name, page_idx);
+                    if (page.occupancy[slot_idx]) {
+                        const size_t row_start = slot_idx * table.row_size;
+                        if (row_start + table.row_size <= SLOT_SPACE) {
+                            const Data pk_val =
+                                read_data(DataType::INT, page.data + row_start + column_offsets[0]);
+                            if (std::holds_alternative<int>(pk_val) && std::get<int>(pk_val) == pk_lookup) {
+                                Data predicate_value = std::monostate{};
+                                const size_t pred_off = column_offsets[predicate_column_index];
+                                if (row_start + pred_off + get_data_size(table.columns[predicate_column_index].type)
+                                    <= SLOT_SPACE) {
+                                    predicate_value = read_data(table.columns[predicate_column_index].type,
+                                                                  page.data + row_start + pred_off);
+                                }
+                                if (std::visit([&](auto &typed_pred) { return typed_pred.eval(predicate_value); },
+                                               pred)) {
+                                    for (size_t ci = 0; ci < selected_indices.size(); ci++) {
+                                        const size_t off = column_offsets[selected_indices[ci]];
+                                        if (row_start + off + get_data_size(table.columns[selected_indices[ci]].type)
+                                            > SLOT_SPACE) {
+                                            continue;
+                                        }
+                                        Data value = read_data(table.columns[selected_indices[ci]].type,
+                                                               page.data + row_start + off);
+                                        print_value(value);
+                                    }
+                                    std::cout << '\n';
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (...) {
+            }
+        }
+    }
+
     for (size_t page_index{0}; page_index < table.pages; page_index++) {
         LogicalPage page = PageIO::read_page(table.name, page_index);
         for (size_t slot{0}; slot < max_occupancy; slot++) {
@@ -265,7 +368,48 @@ size_t MemoryLayer::remove(Table &table, VariablePredicate &pred) {
         }
     };
 
-    size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
+    const size_t max_occupancy = std::min(MAX_OCCUPANCY, SLOT_SPACE / table.row_size);
+
+    int pk_lookup = 0;
+    if (has_predicate && int_pk_equality_fast_path(table, pred, pk_lookup)) {
+        const uint64_t key_u = static_cast<uint64_t>(pk_lookup);
+        if (table.primary_key_btree->contains(key_u)) {
+            try {
+                const uint64_t packed = table.primary_key_btree->search(key_u);
+                size_t page_idx = 0;
+                size_t slot_idx = 0;
+                unpack_row_locator(packed, page_idx, slot_idx);
+                if (page_idx < table.pages && slot_idx < max_occupancy) {
+                    LogicalPage page = PageIO::read_page(table.name, page_idx);
+                    if (page.occupancy[slot_idx]) {
+                        const size_t row_start = slot_idx * table.row_size;
+                        if (row_start + table.row_size <= SLOT_SPACE) {
+                            const Data pk_val =
+                                read_data(DataType::INT, page.data + row_start + column_offsets[0]);
+                            if (std::holds_alternative<int>(pk_val) && std::get<int>(pk_val) == pk_lookup) {
+                                Data predicate_value = std::monostate{};
+                                const size_t pred_off = column_offsets[predicate_column_index];
+                                if (row_start + pred_off + get_data_size(table.columns[predicate_column_index].type)
+                                    <= SLOT_SPACE) {
+                                    predicate_value = read_data(table.columns[predicate_column_index].type,
+                                                                  page.data + row_start + pred_off);
+                                }
+                                if (std::visit([&](auto &typed_pred) { return typed_pred.eval(predicate_value); },
+                                               pred)) {
+                                    table.primary_key_btree->remove(key_u);
+                                    page.occupancy[slot_idx] = 0;
+                                    PageIO::write_page(table.name, page_idx, page);
+                                    return 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (...) {
+            }
+        }
+    }
+
     size_t removed_rows = 0;
     for (size_t page_index{0}; page_index < table.pages; page_index++) {
         LogicalPage page = PageIO::read_page(table.name, page_index);
