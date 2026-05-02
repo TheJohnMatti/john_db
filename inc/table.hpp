@@ -14,11 +14,9 @@
 struct Table {
     Table() : name{"unnamed_table"} {}
     Table(std::string name)
-        : name{std::move(name)},
-          primary_key_btree{std::make_unique<BTree>(
-              "primary_key",
-              (std::filesystem::path("tables") / this->name / "btrees").string())} {}
+        : name{std::move(name)} {}
     std::string name;
+    std::string table_dir;
     std::vector<Column> columns;
     std::unordered_map<std::string, size_t> column_index;
     size_t row_size = 0, pages = 0;

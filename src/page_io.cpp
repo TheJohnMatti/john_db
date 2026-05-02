@@ -4,10 +4,16 @@
 
 const LogicalPage null_page{};
 
+std::string PageIO::data_dir = "tables";
+
+void PageIO::set_data_dir(std::string dir) {
+    data_dir = dir;
+}
+
 LogicalPage PageIO::read_page(const std::string &table_name, const std::string &page_name) {
     LogicalPage result;
     const std::filesystem::path path =
-        std::filesystem::path("tables") / table_name / ("page_" + page_name + ".data");
+        std::filesystem::path(data_dir) / table_name / ("page_" + page_name + ".data");
     std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open()) return result;
     file.read((char*)&result, PAGE_SIZE);
@@ -20,7 +26,7 @@ LogicalPage PageIO::read_page(const std::string &table_name, const size_t page_n
 
 void PageIO::write_page(const std::string &table_name, const std::string &page_name, const LogicalPage &page_data) {
     const std::filesystem::path path =
-        std::filesystem::path("tables") / table_name / ("page_" + page_name + ".data");
+        std::filesystem::path(data_dir) / table_name / ("page_" + page_name + ".data");
     std::ofstream file(path, std::ios::out | std::ios::binary);
     file.write((char*)&page_data, PAGE_SIZE);
 }
