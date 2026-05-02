@@ -225,16 +225,10 @@ void BTree::write_node(uint64_t node_id, const BTreeNode &node) const {
     file.close();
 }
 
-<<<<<<< HEAD
-uint64_t BTree::allocate_node_id() const {
-    static uint64_t next_id = 1;
-    return next_id++;
-=======
 uint64_t BTree::allocate_node_id() {
     const uint64_t node_id = next_node_id++;
     write_metadata();
     return node_id;
->>>>>>> e56c3d6 (feat: persistent b+ tree)
 }
 
 void BTree::split_child(uint64_t parent_id, uint32_t child_index) {
@@ -324,13 +318,6 @@ bool BTree::remove_from_node(uint64_t node_id, uint64_t key) {
             write_node(node_id, node);
             return true;
         }
-<<<<<<< HEAD
-=======
-        return remove_from_node(node.children[i], key);
-    }
-
-    if (node.is_leaf) {
->>>>>>> e56c3d6 (feat: persistent b+ tree)
         return false;
     }
 
