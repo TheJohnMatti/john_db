@@ -64,12 +64,13 @@ bool BTree::remove(uint64_t key) {
     return remove_from_node(root_node_id, key);
 }
 
-std::string BTree::get_node_path(uint64_t node_id) const {
-    return tree_directory + "/" + tree_name + "/node_" + std::to_string(node_id) + ".data";
+std::filesystem::path BTree::get_node_path(uint64_t node_id) const {
+    return std::filesystem::path(tree_directory) / tree_name
+           / ("node_" + std::to_string(node_id) + ".data");
 }
 
 void BTree::ensure_btree_dir() const {
-    std::filesystem::path dir = tree_directory + "/" + tree_name;
+    const std::filesystem::path dir = std::filesystem::path(tree_directory) / tree_name;
     if (!std::filesystem::is_directory(dir)) {
         std::filesystem::create_directories(dir);
     }

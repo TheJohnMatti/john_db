@@ -28,7 +28,7 @@ private:
     std::string tree_name;
     std::string tree_directory;
     uint64_t root_node_id;
-    std::string get_node_path(uint64_t node_id) const;
+    std::filesystem::path get_node_path(uint64_t node_id) const;
     void ensure_btree_dir() const;
     BTreeNode read_node(uint64_t node_id) const;
     void write_node(uint64_t node_id, const BTreeNode &node) const;

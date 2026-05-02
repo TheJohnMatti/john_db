@@ -14,7 +14,9 @@ struct Table {
     Table() : name{"unnamed_table"} {}
     Table(std::string name)
         : name{std::move(name)},
-          primary_key_btree{std::make_unique<BTree>("primary_key", "tables/" + this->name + "/btrees")} {}
+          primary_key_btree{std::make_unique<BTree>(
+              "primary_key",
+              (std::filesystem::path("tables") / this->name / "btrees").string())} {}
     std::string name;
     std::vector<Column> columns;
     std::unordered_map<std::string, size_t> column_index;
@@ -36,10 +38,12 @@ struct Table {
         return column_index.at(name);
     }
     void write_table_metadata() {
-        std::filesystem::path path{ "tables/" + name };
-        if (!std::filesystem::is_directory(path)) std::filesystem::create_directory(path);
-        std::filesystem::path metadata_path{ path.string() + "/metadata.data" };
-        std::ofstream output_file{ metadata_path };
+        const std::filesystem::path path = std::filesystem::path("tables") / name;
+        if (!std::filesystem::is_directory(path)) {
+            std::filesystem::create_directory(path);
+        }
+        const std::filesystem::path metadata_path = path / "metadata.data";
+        std::ofstream output_file{metadata_path};
         output_file << columns.size() << '\n';
         std::vector<std::string> indexes;
         for (const Column& col : columns) {
@@ -52,8 +56,8 @@ struct Table {
     }
     static Table parse_table_metadata(const std::filesystem::directory_entry &dir) {
         Table table{ dir.path().filename().string() };
-        std::filesystem::path metadata_path{ dir.path().string() + "/metadata.data" };
-        std::ifstream input_file{ metadata_path };
+        const std::filesystem::path metadata_path = dir.path() / "metadata.data";
+        std::ifstream input_file{metadata_path};
         if (!input_file.is_open()) {
             std::cerr << "Unable to open metadata at: " << metadata_path.string() << std::endl;
             return table;

@@ -19,10 +19,11 @@ Engine& Engine::instance() {
 }
 
 void Engine::read_tables_folder() {
-    if (!std::filesystem::is_directory("tables")) std::filesystem::create_directory("tables");
-    std::filesystem::path path{ "tables" };
-    std::filesystem::directory_iterator dir{ path };
-    for (auto &i : dir) {
+    const std::filesystem::path tables_root{"tables"};
+    if (!std::filesystem::is_directory(tables_root)) {
+        std::filesystem::create_directory(tables_root);
+    }
+    for (const auto &i : std::filesystem::directory_iterator(tables_root)) {
         if (!i.is_directory()) {
             continue;
         }
@@ -305,7 +306,7 @@ void Engine::run_drop(Query &query) {
     if (tables.find(table_name) == tables.end()) {
         throw ReferenceError("Table " + table_name + " does not exist");
     }
-    const std::filesystem::path table_dir = std::filesystem::path("tables") / table_name;
+    const std::filesystem::path table_dir = std::filesystem::path{"tables"} / table_name;
     std::error_code ec;
     std::uintmax_t removed = std::filesystem::remove_all(table_dir, ec);
     (void)removed;
