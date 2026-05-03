@@ -27,4 +27,4 @@ jobs:
 
     - name: Run tests
       working-directory: build
-      run: ctest --timeout 60 --output-on-failure -C Debug
+      run: ctest --timeout 60 --output-on-failure -C Debug --parallel 1
