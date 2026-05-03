@@ -61,6 +61,7 @@ struct Table {
     }
     static Table parse_table_metadata(const std::filesystem::directory_entry &dir) {
         Table table{ dir.path().filename().string() };
+        table.table_dir = dir.path().string();
         const std::filesystem::path metadata_path = dir.path() / "metadata.data";
         std::ifstream input_file{metadata_path};
         if (!input_file.is_open()) {
@@ -87,6 +88,12 @@ struct Table {
         int page_count;
         input_file >> page_count;
         table.pages = page_count;
+        if (!table.primary_key_btree) {
+            table.primary_key_btree = std::make_unique<BTree>(
+                "primary_key",
+                (std::filesystem::path(table.table_dir) / "btrees").string()
+            );
+        }
         return table;
     }
 };

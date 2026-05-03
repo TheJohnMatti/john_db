@@ -69,6 +69,13 @@ MemoryLayer::MemoryLayer(std::string data_dir) : data_dir(data_dir) {
 void MemoryLayer::create_table(Table &table) {
     table.table_dir = data_dir + "/" + table.name;
     std::filesystem::create_directories(table.table_dir);
+    // Initialize the primary key BTree
+    if (!table.primary_key_btree) {
+        table.primary_key_btree = std::make_unique<BTree>(
+            "primary_key",
+            (std::filesystem::path(table.table_dir) / "btrees").string()
+        );
+    }
 }
 
 std::optional<std::pair<size_t, size_t>> MemoryLayer::try_insert_at(Table &table, std::vector<Data> &values,
