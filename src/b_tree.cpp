@@ -95,12 +95,21 @@ void BTree::set_leaf_next(BTreeNode &node, uint64_t next_id) {
     node.children[BTREE_MAX_KEYS] = next_id;
 }
 
-BTree::BTree(const std::string &name, std::string directory_path)
+BTree::BTree(const std::string &name, std::string directory_path, bool skip_inference)
     : tree_name(name), tree_directory(std::move(directory_path)), root_node_id(0), next_node_id(1) {
     ensure_btree_dir();
     const std::filesystem::path metadata_path = get_metadata_path();
     if (std::filesystem::exists(metadata_path)) {
         read_metadata();
+    } else if (skip_inference) {
+        // For new tables, just create a fresh BTree without inference
+        BTreeNode root{};
+        root.is_leaf = 1;
+        root.count = 0;
+        set_leaf_next(root, 0);
+        write_node(root_node_id, root);
+        next_node_id = 1;
+        write_metadata();
     } else {
         const std::filesystem::path node_dir = std::filesystem::path(tree_directory) / tree_name;
         const std::filesystem::path root_path = get_node_path(root_node_id);
