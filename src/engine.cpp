@@ -319,7 +319,7 @@ void Engine::run_drop(Query &query) {
 
 void Engine::run() {
     while (1) {
-        std::cout << "johndb> ";
+        std::cout << "steledb> ";
         std::string query;
         if (!std::getline(std::cin, query)) {
             std::cin.clear();

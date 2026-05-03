@@ -6,7 +6,7 @@
 #include "engine.hpp"
 
 void print_intro() {
-    std::cout << "Welcome to JohnDB!" << std::endl;
+    std::cout << "Welcome to SteleDB!" << std::endl;
 }
 
 int main() {
