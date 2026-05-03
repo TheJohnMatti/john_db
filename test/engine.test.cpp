@@ -5,9 +5,9 @@
 
 int main() {
     // Clean up any existing test data
-    std::filesystem::remove_all("test_data");
+    std::filesystem::remove_all("test_data_engine");
 
-    Engine engine("test_data");
+    Engine engine("test_data_engine");
 
     // Test CREATE TABLE
     engine.run_query("CREATE TABLE users (id INT, name STRING, active BOOL);");

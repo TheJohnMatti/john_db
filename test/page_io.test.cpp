@@ -8,11 +8,11 @@
 #include "page_io.hpp"
 
 int main() {
-    PageIO::set_data_dir("test_data");
+    PageIO::set_data_dir("test_data_page_io");
     const std::string table_name = "test_table";
     const std::string page_name = "test_page";
 
-    std::filesystem::create_directories(std::filesystem::path("test_data") / table_name);
+    std::filesystem::create_directories(std::filesystem::path("test_data_page_io") / table_name);
 
     LogicalPage page_data{};
     std::iota(page_data.data, page_data.data + SLOT_SPACE, static_cast<char>(0));

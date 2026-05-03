@@ -10,7 +10,7 @@
 namespace {
 
 std::filesystem::path make_unique_test_root() {
-    return "test_data";
+    return "test_data_b_tree";
 }
 
 void cleanup(const std::filesystem::path &root) {
@@ -181,7 +181,8 @@ void test_reopen_same_directory_split_tree() {
 
 int main() {
     std::cout << "b_tree.test.cpp\n";
-    PageIO::set_data_dir("test_data");
+    std::filesystem::remove_all("test_data_b_tree");
+    PageIO::set_data_dir("test_data_b_tree");
     test_empty_search_throws();
     test_single_insert_search_contains();
     test_sequential_keys_values();

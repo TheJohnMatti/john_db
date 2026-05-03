@@ -220,18 +220,20 @@ BTreeNode BTree::read_node(uint64_t node_id) const {
     BTreeNode node{};
     const std::filesystem::path path = get_node_path(node_id);
     std::ifstream file(path, std::ios::binary);
-    if (file.is_open()) {
-        file.read(reinterpret_cast<char *>(&node), sizeof(BTreeNode));
-        file.close();
+    if (!file) { 
+        throw std::runtime_error("FATAL: Cannot read B-Tree node: " + path.string());
     }
+    file.read(reinterpret_cast<char *>(&node), sizeof(BTreeNode));
     return node;
 }
 
 void BTree::write_node(uint64_t node_id, const BTreeNode &node) const {
     const std::filesystem::path path = get_node_path(node_id);
     std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("FATAL: Cannot write B-Tree node: " + path.string());
+    }
     file.write(reinterpret_cast<const char *>(&node), sizeof(BTreeNode));
-    file.close();
 }
 
 uint64_t BTree::allocate_node_id() {

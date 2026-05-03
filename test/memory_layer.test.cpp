@@ -8,9 +8,9 @@
 #include <filesystem>
 
 int main() {
-    std::filesystem::remove_all("test_data");
+    std::filesystem::remove_all("test_data_memory_layer");
 
-    MemoryLayer memory_layer("test_data");
+    MemoryLayer memory_layer("test_data_memory_layer");
 
     // Create table
     Table table("users");
