@@ -11,17 +11,17 @@
 #include "memory_layer.hpp"
 class Engine {
 
-    private:
-    Engine();
-    std::unordered_map<std::string, Table> tables;
-    MemoryLayer &memory_layer = MemoryLayer::instance();
-
     public:
-    static Engine& instance();
-    void init();
-    void read_tables_folder();
-    void run(Query&);
+    Engine(std::string data_dir = "tables");
     void run_query(std::string_view query);
+    void run();
+
+    private:
+    std::unordered_map<std::string, Table> tables;
+    MemoryLayer memory_layer;
+    QueryProcessor query_processor;
+    void read_tables_folder();
+    void run_parsed_query(Query&);
     void run_select(Query&);
     void run_create(Query&);
     void run_insert(Query&);

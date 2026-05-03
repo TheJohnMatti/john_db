@@ -8,7 +8,6 @@
 #include <functional>
 #include <utility>
 #include <bitset>
-#include "engine.hpp"
 #include "token.hpp"
 #include "query_result.hpp"
 #include "query.hpp"

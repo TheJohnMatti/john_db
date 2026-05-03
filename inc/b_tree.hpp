@@ -44,7 +44,7 @@ private:
     void insert_non_full(uint64_t node_id, uint64_t key, uint64_t value);
     bool remove_from_node(uint64_t node_id, uint64_t key);
 public:
-    BTree(const std::string &name, std::string directory_path);
+    BTree(const std::string &name, std::string directory_path, bool skip_inference = false);
     void insert(uint64_t key, uint64_t value);
     uint64_t search(uint64_t key) const;
     bool contains(uint64_t key) const;

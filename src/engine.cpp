@@ -6,17 +6,10 @@
 #include "error.hpp"
 #include "predicate.hpp"
 
-Engine::Engine() {};
-
-void Engine::init() {
+Engine::Engine(std::string data_dir) : memory_layer(data_dir) {
     read_tables_folder();
     for (auto &i : tables) i.second.write_table_metadata();
 };
-
-Engine& Engine::instance() {
-    static Engine inst;
-    return inst;
-}
 
 void Engine::read_tables_folder() {
     const std::filesystem::path tables_root{"tables"};
@@ -32,7 +25,7 @@ void Engine::read_tables_folder() {
     }
 }
 
-void Engine::run(Query& query) {
+void Engine::run_parsed_query(Query& query) {
     if (query.empty()) return;
     try {
         auto &first_token = query[0];
@@ -71,10 +64,9 @@ void Engine::run(Query& query) {
 }
 
 void Engine::run_query(std::string_view query) {
-    QueryProcessor processor;
-    Query tokens = processor.process(query);
+    Query tokens = query_processor.process(query);
     if (tokens.empty()) return;
-    run(tokens);
+    run_parsed_query(tokens);
 }
 
 
@@ -182,6 +174,7 @@ void Engine::run_create(Query &query) {
     if (i < query.size()) throw SyntaxError("Expected termination");
     const std::string persisted_name = new_table.name;
     tables.insert({ persisted_name, std::move(new_table) });
+    memory_layer.create_table(tables.at(persisted_name));
     tables.at(persisted_name).write_table_metadata();
 };
 
@@ -322,4 +315,22 @@ void Engine::run_drop(Query &query) {
     }
     tables.erase(table_name);
     std::cout << "Dropped table " << table_name << std::endl;
+}
+
+void Engine::run() {
+    while (1) {
+        std::cout << "johndb> ";
+        std::string query;
+        if (!std::getline(std::cin, query)) {
+            std::cin.clear();
+            std::cout << '\n';
+            return;
+        }
+        if (query == "quit") return;
+        try {
+            run_query(query);
+        } catch (const std::exception &e) {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
+    }
 }

@@ -61,7 +61,23 @@ bool pk_equality_fast_path(const Table &table, const VariablePredicate &pred, ui
 
 } // namespace
 
-MemoryLayer::MemoryLayer() {}
+MemoryLayer::MemoryLayer(std::string data_dir) : data_dir(data_dir) {
+    std::filesystem::create_directories(data_dir);
+    PageIO::set_data_dir(data_dir);
+}
+
+void MemoryLayer::create_table(Table &table) {
+    table.table_dir = data_dir + "/" + table.name;
+    std::filesystem::create_directories(table.table_dir);
+    // Initialize the primary key BTree for new tables
+    if (!table.primary_key_btree) {
+        table.primary_key_btree = std::make_unique<BTree>(
+            "primary_key",
+            (std::filesystem::path(table.table_dir) / "btrees").string(),
+            true  // skip_inference for new tables
+        );
+    }
+}
 
 std::optional<std::pair<size_t, size_t>> MemoryLayer::try_insert_at(Table &table, std::vector<Data> &values,
                                                                    size_t page_index) {
@@ -307,11 +323,6 @@ void MemoryLayer::select(Table &table, std::vector<std::string> cols, VariablePr
             std::cout << '\n';
         }
     }
-}
-
-MemoryLayer &MemoryLayer::instance() {
-    static MemoryLayer memory_layer;
-    return memory_layer;
 }
 
 size_t MemoryLayer::remove(Table &table, VariablePredicate &pred) {
