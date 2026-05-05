@@ -37,8 +37,13 @@ bool pk_equality_fast_path(const Table &table, const VariablePredicate &pred, ui
             break;
         }
         case DataType::VARCHAR_16: {
-            // For strings, we can't easily hash to uint64_t, so skip for now
-            return false;
+            const auto &p = std::get<Predicate<std::string>>(pred);
+            if (p.op.type != TokenType::EQUAL) return false;
+            if (table.get_column_index(p.target_column) != pk_idx) return false;
+            if (!std::holds_alternative<std::string>(p.arg2.data)) return false;
+            pk_out = hash_string_key(std::get<std::string>(p.arg2.data));
+            is_equal = true;
+            break;
         }
         case DataType::BOOL: {
             const auto &p = std::get<Predicate<bool>>(pred);
@@ -50,7 +55,6 @@ bool pk_equality_fast_path(const Table &table, const VariablePredicate &pred, ui
             break;
         }
         case DataType::FLOAT: {
-            // Floats are tricky for equality, skip
             return false;
         }
         default:
@@ -113,7 +117,7 @@ void MemoryLayer::insert(Table &table, std::vector<Data> &values) {
         } else if (std::holds_alternative<bool>(pk_data)) {
             pk_value = static_cast<uint64_t>(std::get<bool>(pk_data));
         } else if (std::holds_alternative<std::string>(pk_data)) {
-            throw std::runtime_error("String primary keys not supported yet");
+            pk_value = hash_string_key(std::get<std::string>(pk_data));
         } else {
             throw std::runtime_error("Unsupported primary key type");
         }
