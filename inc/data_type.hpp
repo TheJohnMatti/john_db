@@ -2,10 +2,17 @@
 
 #include <array>
 #include <variant>
+#include <functional>
 
 using Data = std::variant<std::monostate, std::string, int, bool, double>;
 
 const size_t MAX_STRING_SIZE = 16;
+
+// Hash function for string primary keys to uint64_t
+inline uint64_t hash_string_key(const std::string &str) {
+    std::hash<std::string> hasher;
+    return hasher(str);
+}
 
 // not open to reordering
 enum class DataType : uint8_t {
